@@ -1,11 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { GameEngine, CARD_TYPES } from '../src/game-engine.js';
+import { createMadokaDeck } from '../src/card-data.js';
 
 const familiar = (id, atk) => ({ id, name:id, type:CARD_TYPES.FAMILIAR, attack:atk });
 const witch = (id, atk, threshold) => ({ id, name:id, type:CARD_TYPES.WITCH, attack:atk, tributeThreshold:threshold });
 const boost = (id, value) => ({ id, name:id, type:CARD_TYPES.MAGIC, chainable:true, effect:'boost', value });
 const nullify = (id) => ({ id, name:id, type:CARD_TYPES.MAGIC, chainable:true, effect:'nullifyDamage' });
+const drawTwo = (id) => ({ id, name:id, type:CARD_TYPES.MAGIC, chainable:false, effect:'draw', value:2 });
 const chars = {
   madoka:{id:'madoka',name:'鹿目まどか'},
   mami:{id:'mami',name:'巴マミ'},
@@ -93,4 +95,28 @@ test('special moves can be reused whenever the player has priority', () => {
   e.activateSpecial(1);
   e.passPriorityTo(1);
   assert.equal(e.canUseSpecial(1), true);
+});
+
+test('draw-two magic is a main-phase action and draws two cards', () => {
+  const e=engine();
+  const p=e.player(0);
+  p.hand=[drawTwo('cup')];
+  const before=p.deck.length;
+  e.activateMainMagic(0,'cup');
+  assert.equal(p.hand.length,2);
+  assert.equal(before-p.deck.length,2);
+  assert.equal(p.graveyard.some(c=>c.id==='cup'),true);
+});
+
+test('Madoka deck is exactly 30 cards with the agreed distribution', () => {
+  const deck=createMadokaDeck();
+  assert.equal(deck.length,30);
+  assert.equal(deck.filter(c=>c.type===CARD_TYPES.FAMILIAR).length,12);
+  assert.equal(deck.filter(c=>c.type===CARD_TYPES.WITCH).length,6);
+  assert.equal(deck.filter(c=>c.type===CARD_TYPES.MAGIC).length,12);
+  assert.equal(deck.filter(c=>c.type===CARD_TYPES.WITCH && c.attack===8).length,4);
+  assert.equal(deck.filter(c=>c.type===CARD_TYPES.WITCH && c.attack===10).length,2);
+  assert.deepEqual(deck.filter(c=>c.effect==='boost').map(c=>c.value).sort((a,b)=>a-b),[2,2,2,3,3,3,5]);
+  assert.equal(deck.filter(c=>c.effect==='draw').length,2);
+  assert.equal(deck.filter(c=>c.effect==='nullifyDamage').length,3);
 });
