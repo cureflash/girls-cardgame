@@ -1,0 +1,44 @@
+:root {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #222;
+  background: #f5f5f5;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+header { display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; background: white; border-bottom: 1px solid #ddd; }
+h1, h2, h3, p { margin: 0; }
+header p { color: #666; }
+button, select { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: default; opacity: .45; }
+main { display: grid; grid-template-rows: auto auto auto; gap: 10px; max-width: 1180px; margin: 0 auto; padding: 12px; }
+.player, .center-panel { background: white; border: 1px solid #ddd; border-radius: 10px; padding: 10px; }
+.profile { display: flex; gap: 12px; align-items: center; }
+.profile .counts { margin-left: auto; white-space: nowrap; }
+.portrait { width: 58px; height: 58px; object-fit: cover; border-radius: 50%; background: #eee; }
+.portrait.missing { display: none; }
+.cards { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 8px; min-height: 104px; }
+.cards.compact { min-height: 58px; }
+.card { position: relative; width: 72px; height: 100px; padding: 0; border: 2px solid #999; border-radius: 8px; overflow: hidden; background: white; color: #111; }
+.card.red { color: #b32020; }
+.card.selected { outline: 4px solid #333; }
+.card.tribute-selected { outline: 4px dashed #555; }
+.card-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 2; }
+.card-art.missing { display: none; }
+.fallback-card { display: grid; grid-template-rows: auto 1fr auto; width: 100%; height: 100%; padding: 6px; }
+.rank { font-size: 18px; font-weight: 700; text-align: left; }
+.suit { font-size: 34px; place-self: center; }
+.value { font-size: 11px; text-align: right; }
+.card-back { display: grid; place-items: center; font-size: 30px; background: repeating-linear-gradient(45deg, #eee, #eee 6px, #ddd 6px, #ddd 12px); }
+.field { background: #fafafa; padding: 8px; border-radius: 8px; }
+.center-panel { display: grid; gap: 8px; }
+.panel { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 8px; background: #f7f7f7; border-radius: 8px; }
+.button-row { display: flex; gap: 5px; flex-wrap: wrap; }
+.log { min-height: 150px; max-height: 220px; overflow: auto; padding: 10px; background: #181818; color: #eee; border-radius: 8px; white-space: pre-wrap; }
+.actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+.actions span { margin-right: auto; }
+.new-game { display: flex; gap: 6px; }
+@media (max-width: 700px) {
+  .card { width: 62px; height: 88px; }
+  header { align-items: flex-start; gap: 8px; flex-direction: column; }
+}
