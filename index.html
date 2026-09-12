@@ -1,80 +1,26 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Girls Cardgame Prototype</title>
-  <link rel="stylesheet" href="styles.css" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Magical Duel Prototype</title>
+  <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-  <header>
-    <div>
-      <h1>Girls Cardgame Prototype</h1>
-      <p>トランプ版ルールの最小実装</p>
-    </div>
-    <div class="new-game">
-      <button id="new-madoka-btn">まどかで開始</button>
-      <button id="new-mami-btn">マミで開始</button>
-    </div>
-  </header>
-
-  <main>
-    <section class="player ai-side">
-      <div class="profile">
-        <img id="ai-portrait" class="portrait" alt="" />
-        <div><h2 id="ai-name"></h2><p id="ai-ability"></p></div>
-        <div class="counts">山札 <b id="ai-deck"></b> / 墓地 <b id="ai-grave"></b></div>
-      </div>
-      <div id="ai-hand" class="cards compact"></div>
-      <h3>AIの場</h3>
-      <div id="ai-field" class="cards field"></div>
+  <div class="hud"><div id="turn"></div><div id="status"></div><button id="new-game">NEW DUEL</button></div>
+  <main class="board">
+    <section id="top-player" class="player top">
+      <aside class="character-panel"><img class="character-image" alt=""><div class="character-name"></div><div class="passive"></div><div class="special-name"></div></aside>
+      <div class="player-name"></div><div class="hand"></div><div class="field"></div>
     </section>
-
-    <section class="center-panel">
-      <h2 id="turn-label"></h2>
-      <div id="battle-panel" class="panel" hidden>
-        <select id="attacker-select"></select>
-        <span>→</span>
-        <select id="target-select"></select>
-        <button id="attack-btn">攻撃</button>
-      </div>
-
-      <div id="chain-panel" class="panel" hidden>
-        <strong id="chain-score"></strong>
-        <span id="chain-who"></span>
-        <div id="spade-buttons" class="button-row"></div>
-        <button id="pass-chain-btn">パス</button>
-      </div>
-
-      <div id="ace-panel" class="panel" hidden>
-        <p><span id="ace-damage"></span>ダメージを受けます。</p>
-        <button id="use-ace-btn">Aで0にする</button>
-        <button id="take-damage-btn">受ける</button>
-      </div>
-
-      <pre id="log" class="log"></pre>
-    </section>
-
-    <section class="player human-side">
-      <div class="profile">
-        <img id="human-portrait" class="portrait" alt="" />
-        <div><h2 id="human-name"></h2><p id="human-ability"></p></div>
-        <div class="counts">山札 <b id="human-deck"></b> / 墓地 <b id="human-grave"></b></div>
-      </div>
-      <h3>あなたの場（クリックで生贄選択）</h3>
-      <div id="human-field" class="cards field"></div>
-      <div class="actions">
-        <span id="selection-info"></span>
-        <button id="summon-btn">召喚</button>
-        <button id="ritual-btn">ハート儀式</button>
-        <button id="joker-btn">JOKER</button>
-        <button id="end-btn">ターン終了</button>
-      </div>
-      <h3>手札</h3>
-      <div id="human-hand" class="cards"></div>
+    <section class="center"><div id="chain-stack"></div><div id="actions"></div></section>
+    <section id="bottom-player" class="player bottom">
+      <div class="field"></div><div class="hand"></div><div class="player-name"></div>
+      <aside class="character-panel"><img class="character-image" alt=""><div class="character-name"></div><div class="passive"></div><div class="special-name"></div></aside>
     </section>
   </main>
-
-  <script type="module" src="src/app.js"></script>
+  <aside id="log" class="log"></aside>
+  <div id="modal-backdrop" class="modal-backdrop hidden"><div id="modal" class="modal"></div></div>
+  <script type="module" src="./src/app.js"></script>
 </body>
 </html>
