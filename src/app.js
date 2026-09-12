@@ -1,268 +1,217 @@
-import { GameEngine } from './engine.js';
-import { label, tributeCost, isSpadeBoost } from './cards.js';
-import { runAiMain, runAiChainStep, runAiAceStep } from './ai.js';
+import { GameEngine, CARD_TYPES, PHASES } from './game-engine.js';
+import { CHARACTERS, createPrototypeDeck } from './card-data.js';
 
+const $ = (sel) => document.querySelector(sel);
 let engine;
-let selectedHandUid = null;
-let selectedTributes = new Set();
+let selectedHandCard = null;
+let selectedTributes = [];
+let selectedAttacker = null;
 
-const $ = (id) => document.getElementById(id);
-
-function newGame(humanCharacter = 'madoka') {
-  const aiCharacter = humanCharacter === 'madoka' ? 'mami' : 'madoka';
-  engine = new GameEngine({ humanCharacter, aiCharacter });
-  selectedHandUid = null;
-  selectedTributes = new Set();
+function start() {
+  engine = new GameEngine({
+    players: [
+      { id: 'p1', name: 'P1 まどか', character: CHARACTERS.madoka },
+      { id: 'p2', name: 'P2 マミ', character: CHARACTERS.mami },
+    ],
+    decks: [createPrototypeDeck(), createPrototypeDeck()],
+  });
   render();
-  maybeRunAi();
 }
 
-function cardArtPath(characterId, card) {
-  return `assets/cards/${characterId}/${card.code}.png`;
+function label(card) {
+  if (!card) return '';
+  if (card.type === CARD_TYPES.FAMILIAR) return `${card.suit}${card.rank}\n使い魔\nATK ${card.attack}`;
+  if (card.type === CARD_TYPES.WITCH) return `${card.suit}${card.rank}\n魔女\nATK ${card.attack}\n生贄合計≥${card.tributeThreshold}`;
+  return `${card.suit}${card.rank === 1 ? 'A' : card.rank}\n魔法\n${card.effect === 'boost' ? `+${card.value}` : 'ダメージ0'}`;
 }
 
-function characterArtPath(characterId) {
-  return `assets/characters/${characterId}.png`;
-}
-
-function cardElement(card, owner, zone) {
+function renderCard(card, { owner, zone, slot = null } = {}) {
   const el = document.createElement('button');
-  el.className = `card ${card.suit === 'H' || card.suit === 'D' ? 'red' : ''}`;
-  el.type = 'button';
-  el.dataset.uid = card.uid;
-  const art = cardArtPath(owner.characterId, card);
-  el.innerHTML = `
-    <img class="card-art" src="${art}" alt="" />
-    <span class="fallback-card">
-      <span class="rank">${card.kind === 'joker' ? 'JOKER' : card.rank}</span>
-      <span class="suit">${card.suitSymbol}</span>
-      <span class="value">${card.kind === 'familiar' ? `ATK ${card.value}` : card.kind === 'ace' ? 'DMG 0' : 'SPECIAL'}</span>
-    </span>`;
-  const img = el.querySelector('img');
-  img.addEventListener('error', () => img.classList.add('missing'));
+  el.className = `card ${card.type}`;
+  el.dataset.cardId = card.id;
+  el.innerHTML = `<span>${label(card).replaceAll('\n', '<br>')}</span>`;
+  const img = new Image();
+  img.onload = () => { el.style.backgroundImage = `url('${card.image}')`; el.classList.add('has-image'); };
+  img.src = card.image;
 
-  if (zone === 'hand' && owner.id === 'human') {
-    if (card.uid === selectedHandUid) el.classList.add('selected');
-    el.addEventListener('click', () => {
-      selectedHandUid = selectedHandUid === card.uid ? null : card.uid;
-      render();
-    });
-  }
-
-  if (zone === 'field' && owner.id === 'human') {
-    if (selectedTributes.has(card.uid)) el.classList.add('tribute-selected');
-    el.addEventListener('click', () => {
-      if (selectedTributes.has(card.uid)) selectedTributes.delete(card.uid);
-      else selectedTributes.add(card.uid);
-      render();
-    });
+  if (zone === 'hand') {
+    el.onclick = () => { selectedHandCard = card.id; selectedTributes = []; render(); };
+    if (selectedHandCard === card.id) el.classList.add('selected');
+  } else if (zone === 'field') {
+    el.onclick = () => onFieldClick(owner, slot);
+    if (selectedAttacker?.owner === owner && selectedAttacker?.slot === slot) el.classList.add('selected');
+    if (selectedTributes.includes(slot) && owner === engine.state.priorityPlayer) el.classList.add('tribute');
   }
   return el;
 }
 
-function renderPlayer(player, prefix, hideHand = false) {
-  $(`${prefix}-name`).textContent = player.character.name;
-  $(`${prefix}-ability`).textContent = player.character.ability;
-  $(`${prefix}-deck`).textContent = player.deck.length;
-  $(`${prefix}-grave`).textContent = player.grave.length;
-  const portrait = $(`${prefix}-portrait`);
-  portrait.src = characterArtPath(player.characterId);
-  portrait.onerror = () => portrait.classList.add('missing');
-
-  const hand = $(`${prefix}-hand`);
-  hand.innerHTML = '';
-  if (hideHand) {
-    for (let i = 0; i < player.hand.length; i += 1) {
-      const back = document.createElement('div');
-      back.className = 'card card-back';
-      back.textContent = '★';
-      hand.append(back);
-    }
-  } else {
-    player.hand.forEach((card) => hand.append(cardElement(card, player, 'hand')));
-  }
-
-  const field = $(`${prefix}-field`);
-  field.innerHTML = '';
-  player.field.forEach((card) => field.append(cardElement(card, player, 'field')));
-}
-
-function selectedCard() {
-  return engine.players[0].hand.find((c) => c.uid === selectedHandUid) ?? null;
-}
-
-function renderControls() {
-  const human = engine.players[0];
-  const currentIsHuman = engine.currentPlayer === human;
-  const battle = engine.battle;
-  $('turn-label').textContent = engine.winner
-    ? `${engine.winner.character.name} 勝利`
-    : `${engine.currentPlayer.character.name}のターン`;
-
-  const summonBtn = $('summon-btn');
-  const ritualBtn = $('ritual-btn');
-  const jokerBtn = $('joker-btn');
-  const endBtn = $('end-btn');
-  const card = selectedCard();
-
-  summonBtn.disabled = !currentIsHuman || Boolean(battle) || !card || card.kind !== 'familiar' || human.summonUsed;
-  ritualBtn.disabled = !currentIsHuman || Boolean(battle) || !card || card.suit !== 'H' || card.kind !== 'familiar' || human.summonUsed;
-  jokerBtn.disabled = !currentIsHuman || Boolean(battle) || !card || card.kind !== 'joker';
-  endBtn.disabled = !currentIsHuman || Boolean(battle) || Boolean(engine.winner);
-
-  const cost = card?.kind === 'familiar' ? tributeCost(card) : 0;
-  $('selection-info').textContent = card
-    ? `${label(card)}を選択中${cost ? ` / 生贄${cost}枚` : ''}`
-    : '手札を選択してください';
-
-  const battlePanel = $('battle-panel');
-  battlePanel.hidden = !currentIsHuman || Boolean(battle) || engine.turn === 0 || human.field.length === 0;
-  const attackerSelect = $('attacker-select');
-  const targetSelect = $('target-select');
-  attackerSelect.innerHTML = human.field.map((c) => `<option value="${c.uid}">${label(c)} (${c.value})</option>`).join('');
-  const enemy = engine.players[1];
-  targetSelect.innerHTML = enemy.field.length
-    ? enemy.field.map((c) => `<option value="${c.uid}">${label(c)} (${c.value})</option>`).join('')
-    : '<option value="">直接攻撃</option>';
-
-  const chainPanel = $('chain-panel');
-  chainPanel.hidden = !(battle && battle.stage === 'chain');
-  if (battle && battle.stage === 'chain') {
-    $('chain-score').textContent = `攻撃側 ${battle.attackerPower} : 防御側 ${battle.defenderPower}`;
-    const humanTurn = battle.chainTurn === 0;
-    $('chain-who').textContent = humanTurn ? 'あなたのチェーン' : 'AI応答中';
-    const boosts = human.hand.filter(isSpadeBoost);
-    const buttons = $('spade-buttons');
-    buttons.innerHTML = '';
-    boosts.forEach((c) => {
-      const b = document.createElement('button');
-      b.textContent = `${label(c)} +${c.value}`;
-      b.disabled = !humanTurn;
-      b.onclick = () => { engine.playSpadeBoost(human, c.uid); render(); maybeRunAi(); };
-      buttons.append(b);
-    });
-    $('pass-chain-btn').disabled = !humanTurn;
-  }
-
-  const acePanel = $('ace-panel');
-  const humanLoses = battle?.stage === 'ace' && battle.result.loserIndex === 0;
-  acePanel.hidden = !humanLoses;
-  if (humanLoses) {
-    $('ace-damage').textContent = battle.result.rawDamage;
-    $('use-ace-btn').disabled = !engine.canUseAce(human);
-  }
-}
-
 function render() {
-  renderPlayer(engine.players[1], 'ai', true);
-  renderPlayer(engine.players[0], 'human', false);
-  renderControls();
-  $('log').textContent = engine.log.slice(-18).join('\n');
+  const s = engine.state;
+  $('#turn').textContent = `TURN ${s.turn} / 優先権: ${engine.player(s.priorityPlayer).name}`;
+  $('#status').textContent = s.phase === PHASES.GAME_OVER ? `${engine.player(s.winner).name} WIN` : s.phase;
+  renderPlayer(1, '#top-player');
+  renderPlayer(0, '#bottom-player');
+  renderActions();
+  renderChain();
+  renderLog();
+  renderModal();
 }
 
-function maybeRunAi() {
-  if (engine.winner) { render(); return; }
+function renderPlayer(index, selector) {
+  const p = engine.player(index);
+  const root = $(selector);
+  root.querySelector('.player-name').textContent = `${p.name} / 山札 ${p.deck.length} / 手札 ${p.hand.length} / 墓地 ${p.graveyard.length}`;
+  root.querySelector('.character-name').textContent = p.character.name;
+  root.querySelector('.passive').textContent = p.character.passive;
+  root.querySelector('.special-name').textContent = p.character.special;
 
-  let safety = 0;
-  while (safety++ < 20) {
-    if (engine.battle?.stage === 'chain' && engine.battle.chainTurn === 1) {
-      runAiChainStep(engine);
-      render();
-      continue;
+  const charImg = root.querySelector('.character-image');
+  charImg.style.display = '';
+  charImg.src = p.character.image;
+  charImg.onerror = () => { charImg.style.display = 'none'; };
+
+  const field = root.querySelector('.field');
+  field.innerHTML = '';
+  p.field.forEach((card, slot) => {
+    const zone = document.createElement('div');
+    zone.className = 'zone';
+    if (card) zone.appendChild(renderCard(card, { owner: index, zone: 'field', slot }));
+    else zone.innerHTML = `<span class="slot-number">${slot + 1}</span>`;
+    field.appendChild(zone);
+  });
+
+  const hand = root.querySelector('.hand');
+  hand.innerHTML = '';
+  p.hand.forEach(card => hand.appendChild(renderCard(card, { owner: index, zone: 'hand' })));
+}
+
+function onFieldClick(owner, slot) {
+  const s = engine.state;
+  const priority = s.priorityPlayer;
+  if (owner === priority && priority === s.activePlayer) {
+    const chosen = engine.player(owner).field[slot];
+    if (!chosen) return;
+    if (selectedHandCard) {
+      const handCard = engine.player(priority).hand.find(c => c.id === selectedHandCard);
+      if (handCard?.type === CARD_TYPES.WITCH && chosen.type === CARD_TYPES.FAMILIAR) {
+        selectedTributes = selectedTributes.includes(slot) ? selectedTributes.filter(x => x !== slot) : [...selectedTributes, slot];
+        render();
+        return;
+      }
     }
-    if (engine.battle?.stage === 'ace' && engine.battle.result.loserIndex === 1) {
-      runAiAceStep(engine);
+    selectedAttacker = { owner, slot };
+    render();
+  } else if (selectedAttacker && selectedAttacker.owner === priority) {
+    try {
+      engine.attack(priority, selectedAttacker.slot, slot);
+      selectedAttacker = null;
+      selectedHandCard = null;
+      selectedTributes = [];
       render();
-      continue;
-    }
-    if (engine.battle?.stage === 'ace' && engine.battle.result.loserIndex === 0) {
-      render();
-      return;
-    }
-    if (engine.currentPlayer.id === 'ai' && !engine.battle) {
-      runAiMain(engine);
-      render();
-      if (engine.battle) continue;
-      engine.endTurn();
-      render();
-      return;
-    }
-    return;
+    } catch (e) { alert(e.message); }
   }
 }
 
-$('summon-btn').onclick = () => {
-  const human = engine.players[0];
-  const card = selectedCard();
-  if (!card) return;
-  const result = engine.normalSummon(human, card.uid, [...selectedTributes]);
-  if (!result.ok) alert(result.error);
-  else { selectedHandUid = null; selectedTributes.clear(); }
-  render();
-};
+function renderActions() {
+  const s = engine.state;
+  const root = $('#actions');
+  root.innerHTML = '';
+  if (s.phase === PHASES.GAME_OVER || s.pendingDecision) return;
+  const p = engine.player(s.priorityPlayer);
+  const card = p.hand.find(c => c.id === selectedHandCard);
 
-$('ritual-btn').onclick = () => {
-  const human = engine.players[0];
-  const heart = selectedCard();
-  if (!heart) return;
-  const eligible = human.hand.filter((c) => c.kind === 'familiar' && c.uid !== heart.uid && c.value < heart.value);
-  if (!eligible.length) { alert('儀式召喚できる使い魔が手札にいません'); return; }
-  const text = eligible.map((c, i) => `${i + 1}: ${label(c)} (${c.value})`).join('\n');
-  const chosen = Number(prompt(`召喚する使い魔を番号で選択\n${text}`, '1')) - 1;
-  if (!Number.isInteger(chosen) || !eligible[chosen]) return;
-  const result = engine.ritualSummon(human, heart.uid, eligible[chosen].uid);
-  if (!result.ok) alert(result.error);
-  else selectedHandUid = null;
-  render();
-};
+  if (s.priorityPlayer === s.activePlayer && card && [CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(card.type)) {
+    root.appendChild(actionButton('召喚', () => {
+      try {
+        engine.summon(s.priorityPlayer, card.id, selectedTributes);
+        selectedHandCard = null;
+        selectedTributes = [];
+        render();
+      } catch (e) { alert(e.message); }
+    }));
+  }
 
-$('joker-btn').onclick = () => {
-  const card = selectedCard();
-  if (!card) return;
-  const mode = confirm('OK: 全フィールドの使い魔を破壊\nキャンセル: 自分の場を全生贄にして合計攻撃力の使い魔にする') ? 'blackhole' : 'ra';
-  const result = engine.playJoker(engine.players[0], card.uid, mode);
-  if (!result.ok) alert(result.error);
-  else selectedHandUid = null;
-  render();
-};
+  if (engine.canUseSpecial(s.priorityPlayer)) {
+    root.appendChild(actionButton(p.character.special, () => {
+      try { engine.activateSpecial(s.priorityPlayer); render(); } catch (e) { alert(e.message); }
+    }, 'special-button'));
+  }
 
-$('attack-btn').onclick = () => {
-  const attackerUid = $('attacker-select').value;
-  const targetUid = $('target-select').value || null;
-  const result = engine.startBattle(attackerUid, targetUid);
-  if (!result.ok) alert(result.error);
-  render();
-  maybeRunAi();
-};
+  if (s.priorityPlayer === s.activePlayer) {
+    root.appendChild(actionButton('ターン終了', () => {
+      try {
+        engine.endTurn(s.priorityPlayer);
+        selectedHandCard = null;
+        selectedAttacker = null;
+        render();
+      } catch (e) { alert(e.message); }
+    }));
+  } else {
+    root.appendChild(actionButton('優先権を返す', () => { engine.passPriorityTo(s.activePlayer); render(); }));
+  }
+}
 
-$('pass-chain-btn').onclick = () => {
-  engine.passChain(engine.players[0]);
-  render();
-  maybeRunAi();
-};
+function actionButton(text, fn, className = '') {
+  const b = document.createElement('button');
+  b.className = `action ${className}`;
+  b.textContent = text;
+  b.onclick = fn;
+  return b;
+}
 
-$('use-ace-btn').onclick = () => {
-  const ace = engine.players[0].hand.find((c) => c.kind === 'ace');
-  engine.resolveBattle(true, ace?.uid ?? null);
-  render();
-  maybeRunAi();
-};
+function renderChain() {
+  const root = $('#chain-stack');
+  root.innerHTML = '';
+  engine.state.chain.forEach((item, i) => {
+    const div = document.createElement('div');
+    div.className = 'chain-item';
+    div.textContent = `CHAIN ${i + 1}  ${engine.player(item.player).name}: ${item.card.name}`;
+    root.appendChild(div);
+  });
+}
 
-$('take-damage-btn').onclick = () => {
-  engine.resolveBattle(false);
-  render();
-  maybeRunAi();
-};
+function renderLog() {
+  $('#log').innerHTML = engine.state.logs.slice(-10).reverse().map(x => `<div>${x}</div>`).join('');
+}
 
-$('end-btn').onclick = () => {
-  engine.endTurn();
-  selectedHandUid = null;
-  selectedTributes.clear();
-  render();
-  maybeRunAi();
-};
+function renderModal() {
+  const d = engine.state.pendingDecision;
+  const backdrop = $('#modal-backdrop');
+  const modal = $('#modal');
+  if (!d) { backdrop.classList.add('hidden'); return; }
+  backdrop.classList.remove('hidden');
+  const p = engine.player(d.player);
+  modal.innerHTML = `<h2>${p.name}</h2>`;
 
-$('new-madoka-btn').onclick = () => newGame('madoka');
-$('new-mami-btn').onclick = () => newGame('mami');
+  if (d.type === 'CHAIN_RESPONSE') {
+    modal.innerHTML += '<h3>チェーンしますか？</h3><p>発動可能な魔法を選択してください。</p>';
+    const list = document.createElement('div');
+    list.className = 'modal-card-list';
+    d.options.forEach(id => {
+      const card = p.hand.find(c => c.id === id);
+      if (!card) return;
+      const b = renderCard(card);
+      b.onclick = () => { engine.respondChain(d.player, id); render(); };
+      list.appendChild(b);
+    });
+    modal.appendChild(list);
+    modal.appendChild(actionButton('発動しない', () => { engine.respondChain(d.player, null); render(); }));
+  }
 
-newGame('madoka');
+  if (d.type === 'MADOKA_REVIVE') {
+    modal.innerHTML += '<h3>プルウィア☆マギカ</h3><p>墓地から蘇生する使い魔・魔女を1体選択。</p>';
+    const list = document.createElement('div');
+    list.className = 'modal-card-list';
+    d.options.forEach(id => {
+      const card = p.graveyard.find(c => c.id === id);
+      if (!card) return;
+      const b = renderCard(card);
+      b.onclick = () => { engine.selectReviveTarget(d.player, id); render(); };
+      list.appendChild(b);
+    });
+    modal.appendChild(list);
+  }
+}
+
+$('#new-game').onclick = start;
+start();
