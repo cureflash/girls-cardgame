@@ -134,6 +134,25 @@ export class GameEngine {
     return destination;
   }
 
+  canActivateMainMagic(playerIndex, cardId) {
+    if (this.state.phase !== PHASES.MAIN || this.state.pendingDecision) return false;
+    if (this.state.activePlayer !== playerIndex || this.state.priorityPlayer !== playerIndex) return false;
+    const card = this.player(playerIndex).hand.find(c => c.id === cardId);
+    return card?.type === CARD_TYPES.MAGIC && card.effect === 'draw';
+  }
+
+  activateMainMagic(playerIndex, cardId) {
+    this.ensurePriority(playerIndex);
+    if (!this.canActivateMainMagic(playerIndex, cardId)) throw new Error('This magic cannot be activated now.');
+    const p = this.player(playerIndex);
+    const index = p.hand.findIndex(c => c.id === cardId);
+    const [card] = p.hand.splice(index, 1);
+    p.graveyard.push(card);
+    this.log(`${p.name}が${card.name}を発動`);
+    this.draw(playerIndex, card.value ?? 0);
+    if (this.state.phase !== PHASES.GAME_OVER) this.passPriorityTo(this.opponent(playerIndex));
+  }
+
   attack(playerIndex, attackerSlot, targetSlot) {
     this.ensurePriority(playerIndex);
     if (this.state.activePlayer !== playerIndex) throw new Error('Only the active player can attack.');
