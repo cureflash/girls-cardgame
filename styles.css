@@ -13,12 +13,12 @@ button { font: inherit; }
 .zone { aspect-ratio: 3 / 4; border:1px dashed #59657b; border-radius:10px; display:flex; align-items:center; justify-content:center; background:#0c1018; position:relative; }
 .slot-number { opacity:.25; font-size:28px; }
 .hand { display:flex; justify-content:center; align-items:flex-end; gap:6px; min-height:116px; flex-wrap:wrap; }
-.card { width:76px; height:106px; border:2px solid #ccd3df; border-radius:8px; background:#f7f7f7; color:#111; display:flex; align-items:center; justify-content:center; text-align:center; font-weight:700; padding:4px; cursor:pointer; background-size:cover; background-position:center; box-shadow:0 4px 12px #0007; }
-.card.magic { border-color:#7ac7ff; background:#dceeff; }
-.card.witch { border-color:#c993ff; background:#eadcff; }
+.card { width:76px; height:106px; border:2px solid #ccd3df; border-radius:8px; background:#f7f7f7; color:#111; display:flex; align-items:center; justify-content:center; text-align:center; font-weight:700; padding:4px; cursor:pointer; background-size:cover; background-position:center; background-repeat:no-repeat; box-shadow:0 4px 12px #0007; }
+.card.magic { border-color:#7ac7ff; background-color:#dceeff; }
+.card.witch { border-color:#c993ff; background-color:#eadcff; }
 .card.selected { outline:4px solid #ffd86b; transform:translateY(-8px); }
 .card.tribute { outline:4px solid #ff6978; }
-.card.has-image span { background:#000a; color:white; width:100%; padding:4px 2px; margin-top:auto; }
+.card.has-image span { display:none; }
 .character-panel { position:absolute; right:12px; top:34px; width:104px; padding:8px; background:#0c1018cc; border:1px solid #4a556a; border-radius:12px; font-size:12px; z-index:2; }
 .character-image { width:100%; max-height:116px; object-fit:contain; }
 .character-name { font-size:15px; font-weight:800; margin:4px 0; }
