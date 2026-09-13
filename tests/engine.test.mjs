@@ -208,15 +208,40 @@ test('witches can tribute witches from a full field and invalid tributes leave s
   assert.deepEqual(p.graveyard.map(c=>c.id),['old8','five']);
 });
 
-test('equal attack destroys both monsters even through a shield with zero damage', () => {
+test('shield protects its familiar in an equal battle and ends the chain immediately', () => {
   const e=engine();
   e.player(0).field[0]=familiar('a',5); e.player(1).field[0]=familiar('b',5);
   e.player(0).hand=[]; e.player(1).hand=[nullify('shield')];
   battle(e);
   const before=e.player(0).deck.length;
-  e.attack(1,0,0); e.respondChain(1,'shield'); passAll(e);
-  assert.equal(e.player(0).field[0],null); assert.equal(e.player(1).field[0],null);
+  e.attack(1,0,0);
+  e.respondChain(1,'shield');
+  assert.equal(e.state.pendingDecision,null);
+  assert.equal(e.state.phase,PHASES.BATTLE);
+  assert.equal(e.player(0).field[0],null);
+  assert.equal(e.player(1).field[0].id,'b');
   assert.equal(e.player(0).deck.length,before);
+  assert.equal(e.player(1).graveyard.some(c=>c.id==='shield'),true);
+});
+
+test('shield ends the chain, keeps earlier boosts spent, protects the familiar, and does not cancel damage', () => {
+  const e=engine();
+  e.player(1).field[0]=familiar('attacker',5);
+  e.player(0).field[0]=familiar('defender',8);
+  e.player(1).hand=[boost('up',5)];
+  e.player(0).hand=[nullify('shield')];
+  battle(e);
+  const before=e.player(0).deck.length;
+  e.attack(1,0,0);
+  e.respondChain(1,'up');
+  assert.equal(e.state.pendingDecision.player,0);
+  e.respondChain(0,'shield');
+  assert.equal(e.state.pendingDecision,null);
+  assert.equal(e.state.chain.length,0);
+  assert.equal(e.player(0).field[0].id,'defender');
+  assert.equal(before-e.player(0).deck.length,1);
+  assert.equal(e.player(1).graveyard.some(c=>c.id==='up'),true);
+  assert.equal(e.player(0).graveyard.some(c=>c.id==='shield'),true);
 });
 
 test('direct attack requires an empty opponent field, applies Madoka reduction and exhausts attacker', () => {
@@ -233,17 +258,17 @@ test('direct attack requires an empty opponent field, applies Madoka reduction a
   assert.equal(e.canAttack(1,0,null),true);
 });
 
-test('direct attack boosts attacker only and shield cancels its damage', () => {
-  for (const shield of [false,true]) {
-    const e=engine(); e.player(1).field[0]=familiar('a',5); battle(e);
-    e.player(1).hand=[boost('up',3)]; e.player(0).hand=[boost('invalid',5), ...(shield?[nullify('shield')]:[])];
-    const before=e.player(0).deck.length;
-    e.attack(1,0,null);
-    assert.equal(e.activatableChainCards(0).some(c=>c.id==='invalid'),false);
-    e.respondChain(1,'up');
-    if(shield) e.respondChain(0,'shield'); passAll(e);
-    assert.equal(before-e.player(0).deck.length,shield?0:7);
-  }
+test('direct attack boosts attacker and shield is not a legal direct-attack response', () => {
+  const e=engine(); e.player(1).field[0]=familiar('a',5); battle(e);
+  e.player(1).hand=[boost('up',3)];
+  e.player(0).hand=[boost('invalid',5), nullify('shield')];
+  const before=e.player(0).deck.length;
+  e.attack(1,0,null);
+  assert.equal(e.activatableChainCards(0).some(c=>c.id==='invalid'),false);
+  assert.equal(e.activatableChainCards(0).some(c=>c.id==='shield'),false);
+  e.respondChain(1,'up');
+  assert.equal(before-e.player(0).deck.length,7);
+  assert.equal(e.player(0).hand.some(c=>c.id==='shield'),true);
 });
 
 test('each monster attacks once and a newly summoned monster can attack', () => {
