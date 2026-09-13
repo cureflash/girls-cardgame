@@ -340,7 +340,8 @@ export class GameEngine {
         ? battle.attackerSlot
         : playerIndex === battle.defenderPlayer ? battle.defenderSlot : null;
       if (slot === null) return false;
-      return this.player(playerIndex).field[slot]?.type === CARD_TYPES.FAMILIAR;
+      const type = this.player(playerIndex).field[slot]?.type;
+      return [CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(type);
     }
     return false;
   }
@@ -427,7 +428,8 @@ export class GameEngine {
     const defendValue = b.defenderBase + b.defenderBonus;
     const shieldProtects = (playerIndex, slot) => {
       if (!b.damagePrevented[playerIndex] || slot === null) return false;
-      return this.player(playerIndex).field[slot]?.type === CARD_TYPES.FAMILIAR;
+      const type = this.player(playerIndex).field[slot]?.type;
+      return [CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(type);
     };
 
     if (!b.direct && attackValue === defendValue) {
