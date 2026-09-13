@@ -205,7 +205,7 @@ function projectBattle(proj, engine, playerIndex, values, features, battleOverri
   } else if (loserSide === 'self') features.shieldSavedPower += norm(loserCard.attack, 13);
 
   const loser = engine.player(loserPlayer);
-  const damage = reducedDamage(loser, Math.abs(values.attacker - values.defender));
+  const damage = values.shielded[loserPlayer] ? 0 : reducedDamage(loser, Math.abs(values.attacker - values.defender));
   if (loserSide === 'self') {
     features.damageToSelf += norm(damage, 13);
     if (damage >= proj.selfDeck) features.selfLethal = 1;
