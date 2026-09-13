@@ -40,7 +40,7 @@ jobs:
           retention-days: 7
       - name: Rollout best-response analysis
         if: contains(github.event.head_commit.message, '[solve-best-response]')
-        run: npm run br:solve -- --character madoka --games 24 --samples 6 --max-actions 220 --output /tmp/best-response.json
+        run: npm run br:solve -- --character madoka --games 40 --samples 16 --min-gain 0.05 --max-actions 220 --output /tmp/best-response.json
       - name: Upload best-response report
         if: contains(github.event.head_commit.message, '[solve-best-response]')
         uses: actions/upload-artifact@v4
