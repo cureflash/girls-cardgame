@@ -4,6 +4,9 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests/*.test.mjs",
-    "rl:random": "node rl/random-baseline.mjs"
+    "rl:random": "node rl/random-baseline.mjs",
+    "ga:evolve": "node ga/evolve.mjs",
+    "ga:evaluate": "node ga/evaluate.mjs",
+    "ga:publish": "node ga/publish.mjs"
   }
 }
