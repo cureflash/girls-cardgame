@@ -1,4 +1,4 @@
-import { ACTIVE_GENOMES } from './evolved-genome.js?v=splitai1';
+import { ACTIVE_GENOMES } from './evolved-genome.js?v=g999';
 import { DEFAULT_GENOME, chooseEvaluationAction, normalizeEvaluationGenome } from './evaluation-ai.js';
 
 const publishedGenomes = Object.freeze({
