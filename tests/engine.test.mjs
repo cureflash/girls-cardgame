@@ -172,13 +172,14 @@ test('main-phase magic is not legal after entering battle phase', () => {
 test('Madoka deck is exactly 30 cards with the agreed distribution', () => {
   const deck=createMadokaDeck();
   assert.equal(deck.length,30);
-  assert.equal(deck.filter(c=>c.type===CARD_TYPES.FAMILIAR).length,12);
+  assert.equal(deck.filter(c=>c.type===CARD_TYPES.FAMILIAR).length,13);
   assert.equal(deck.filter(c=>c.type===CARD_TYPES.WITCH).length,7);
-  assert.equal(deck.filter(c=>c.type===CARD_TYPES.MAGIC).length,11);
+  assert.equal(deck.filter(c=>c.type===CARD_TYPES.MAGIC).length,10);
+  assert.equal(deck.filter(c=>c.type===CARD_TYPES.FAMILIAR && c.attack===3).length,5);
   assert.equal(deck.filter(c=>c.type===CARD_TYPES.WITCH && c.attack===8).length,4);
   assert.equal(deck.filter(c=>c.type===CARD_TYPES.WITCH && c.attack===10).length,2);
   assert.deepEqual(deck.filter(c=>c.effect==='boost').map(c=>c.value).sort((a,b)=>a-b),[2,2,2,3,3,3,5]);
-  assert.equal(deck.filter(c=>c.effect==='draw').length,1);
+  assert.equal(deck.filter(c=>c.effect==='draw').length,0);
   assert.equal(deck.filter(c=>c.effect==='nullifyDamage').length,3);
 });
 
