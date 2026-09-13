@@ -19,21 +19,17 @@
 
 ## 中央集権構成
 
-`GameEngine` が唯一のルール authority。UI は `GameState` を描画し、プレイヤーの意図をコマンドとして渡すだけで、手札・墓地・ダメージ・チェーンを直接変更しない。
+`GameEngine` が唯一のルール authority。UI と強化学習AIは `GameEngine` を直接改変せず、コマンド経由で操作する。
 
 ## 画像差し替え
 
-カード・キャラクター画像パスは `src/card-data.js` に集約。現在は画像が存在しなくてもトランプ風テキスト表示で動く。
-
-将来画像を置く場合:
+カード・キャラクター画像パスは `src/card-data.js` に集約。
 
 - `assets/cards/`
-- `assets/characters/madoka.png`
-- `assets/characters/mami.png`
+- `assets/characters/madoka.webp`
+- `assets/characters/mami.webp`
 
 ## 起動
-
-ES Modules を使うため、ローカルHTTPサーバーで開く。
 
 ```bash
 python -m http.server 8000
@@ -44,7 +40,62 @@ python -m http.server 8000
 ## テスト
 
 ```bash
-node --test tests/engine.test.mjs
+npm test
+```
+
+## 強化学習
+
+強化学習は既存 `GameEngine` の上に `src/rl-adapter.js` を置き、合法手だけを action mask として `MaskablePPO` に渡す。相手の手札内容やデッキ順は観測に含めない。
+
+報酬は勝利 `+1`、敗北 `-1`、途中 `0` のみ。手札補充やダメージなどへの補助報酬は入れていない。
+
+### 1. ランダム同士で環境確認
+
+```bash
+npm run rl:random -- 100
+```
+
+### 2. Python環境
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r rl/requirements.txt
+```
+
+Linux/macOSでは仮想環境の有効化を `source .venv/bin/activate` に読み替える。
+
+### 3. 自己対戦学習
+
+```bash
+python rl/train.py --generations 20 --steps-per-generation 100000
+```
+
+最初はランダムAIと対戦し、その後は過去8世代以内の保存済みpolicyから相手を選ぶ。モデルは `models/policy_XXX.zip` に保存される。
+
+### 4. 評価
+
+```bash
+python rl/evaluate.py models/policy_019.zip --games 1000
+```
+
+別policyと戦わせる場合:
+
+```bash
+python rl/evaluate.py models/policy_019.zip --opponent models/policy_010.zip --games 1000
+```
+
+評価では勝率に加え、序盤被ダメージ、`3n+1` ダメージの割合、魔女召喚回数、チェーン使用回数、必殺技使用回数などを集計する。
+
+## RL構成
+
+```text
+src/game-engine.js   ルールの唯一のauthority
+src/rl-adapter.js    状態ベクトル・固定行動ID・action mask
+rl/server.mjs        Node側ヘッドレス対戦サーバー
+rl/env.py            Gymnasium環境
+rl/train.py          MaskablePPO自己対戦
+rl/evaluate.py       勝率・戦略統計
 ```
 
 ## 未確定のため固定していないもの
