@@ -160,7 +160,8 @@ function projectBattle(proj, engine, playerIndex, values, features, battleOverri
   if (!battle || !values) return;
   const attackerCard = engine.player(battle.attackerPlayer).field[battle.attackerSlot];
   const defenderCard = battle.direct ? null : engine.player(battle.defenderPlayer).field[battle.defenderSlot];
-  const protectedFromDestruction = (absolutePlayer, card) => values.shielded[absolutePlayer] && card?.type === CARD_TYPES.FAMILIAR;
+  const protectedFromDestruction = (absolutePlayer, card) => values.shielded[absolutePlayer]
+    && [CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(card?.type);
 
   if (battle.direct) {
     const defender = engine.player(battle.defenderPlayer);
