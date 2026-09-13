@@ -32,6 +32,25 @@ test('information key does not reveal opponent hand identity or deck order', () 
   );
 });
 
+test('information key abstracts hand order and duplicate artwork identity', () => {
+  const original = createMatch(24680, false);
+  const altered = cloneAdapter(original);
+  altered.engine.player(0).hand.reverse();
+  for (const card of altered.engine.player(0).hand) {
+    if (card.type === 'familiar') {
+      card.code = `equivalent-familiar-${card.attack}`;
+      card.name = 'equivalent familiar';
+    }
+  }
+
+  const legalOriginal = original.legalActions(0);
+  const legalAltered = altered.legalActions(0);
+  assert.equal(
+    informationKey(original, 0, legalOriginal),
+    informationKey(altered, 0, legalAltered),
+  );
+});
+
 test('regret solver completes a real-game smoke iteration and records normalized strategies', () => {
   const solver = new RegretSolver({
     seed: 77,
