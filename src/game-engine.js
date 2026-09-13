@@ -66,7 +66,6 @@ export class GameEngine {
   opponent(index) { return 1 - index; }
   log(message) { this.state.logs.push(message); }
 
-  // Presentation consumes these records; effects never decide or delay the rules.
   emit(type, detail = {}) {
     this.state.events.push({ id: this.state.events.length, turn: this.state.turn, type, ...detail });
   }
@@ -116,55 +115,123 @@ export class GameEngine {
     return this.validTributeSets(playerIndex, card).length > 0;
   }
 
+  _handTributePlans(playerIndex, witchCard) {
+    const p = this.player(playerIndex);
+    const familiars = p.hand.filter(c => c.id !== witchCard.id && c.type === CARD_TYPES.FAMILIAR);
+    const plans = new Map([[0, []]]);
+    for (const card of familiars) {
+      for (const [sum, ids] of [...plans.entries()]) {
+        const next = sum + (card.attack ?? 0);
+        const candidate = [...ids, card.id];
+        const current = plans.get(next);
+        if (!current || candidate.length < current.length) plans.set(next, candidate);
+      }
+    }
+    return [...plans.entries()]
+      .map(([total, handIds]) => ({ total, handIds }))
+      .sort((a, b) => a.total - b.total || a.handIds.length - b.handIds.length);
+  }
+
   validTributeSets(playerIndex, witchCard) {
-    const fieldCards = this.player(playerIndex).field
+    const p = this.player(playerIndex);
+    const fieldCards = p.field
       .map((card, slot) => ({ card, slot }))
       .filter(x => x.card && [CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(x.card.type));
+    const handPlans = this._handTributePlans(playerIndex, witchCard);
     const threshold = witchCard.tributeThreshold ?? 0;
     const results = [];
     const n = fieldCards.length;
-    for (let mask = 1; mask < (1 << n); mask++) {
-      const chosen = [];
-      let total = 0;
+    for (let mask = 0; mask < (1 << n); mask++) {
+      const slots = [];
+      let fieldTotal = 0;
       for (let i = 0; i < n; i++) {
         if (mask & (1 << i)) {
-          chosen.push(fieldCards[i].slot);
-          total += fieldCards[i].card.attack ?? 0;
+          slots.push(fieldCards[i].slot);
+          fieldTotal += fieldCards[i].card.attack ?? 0;
         }
       }
-      if (total >= threshold) results.push({ slots: chosen, total });
+      if (!p.field.includes(null) && slots.length === 0) continue;
+      const needed = Math.max(0, threshold - fieldTotal);
+      const handPlan = handPlans.find(plan => plan.total >= needed);
+      if (!handPlan) continue;
+      if (slots.length === 0 && handPlan.handIds.length === 0) continue;
+      results.push({ slots, handIds: handPlan.handIds, total: fieldTotal + handPlan.total });
     }
-    return results.sort((a, b) => a.total - b.total || a.slots.length - b.slots.length);
+    return results.sort((a, b) => a.total - b.total
+      || (a.slots.length + a.handIds.length) - (b.slots.length + b.handIds.length)
+      || a.slots.length - b.slots.length);
   }
 
-  summon(playerIndex, cardId, tributeSlots = []) {
+  _normalizeTributes(tributeRefs = []) {
+    return tributeRefs.map(ref => {
+      if (Number.isInteger(ref)) return { zone: 'field', slot: ref };
+      if (ref?.zone === 'field') return { zone: 'field', slot: ref.slot };
+      if (ref?.zone === 'hand') return { zone: 'hand', id: ref.id };
+      throw new Error('Invalid tribute reference.');
+    });
+  }
+
+  summon(playerIndex, cardId, tributeRefs = []) {
     this.ensurePriority(playerIndex);
     if (!this.canSummon(playerIndex, cardId)) throw new Error('Card cannot be summoned in the current state.');
     const p = this.player(playerIndex);
-    const handIndex = p.hand.findIndex(c => c.id === cardId);
-    const card = p.hand[handIndex];
+    const card = p.hand.find(c => c.id === cardId);
+    let normalized = this._normalizeTributes(tributeRefs);
 
     if (card.type === CARD_TYPES.WITCH) {
-      const unique = [...new Set(tributeSlots)];
-      const tributes = unique.map(slot => p.field[slot]);
-      if (!unique.length || unique.some(slot => !Number.isInteger(slot) || slot < 0 || slot >= 5)
-        || tributes.some(c => !c || ![CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(c.type))) throw new Error('生贄には場の使い魔・魔女を選んでください。');
-      const total = tributes.reduce((sum, c) => sum + (c.attack ?? 0), 0);
-      if (total < (card.tributeThreshold ?? 0)) throw new Error('Tribute attack is below threshold.');
-      unique.forEach(slot => {
-        p.graveyard.push(p.field[slot]);
-        p.field[slot] = null;
+      const legacyFieldOnly = tributeRefs.every(ref => Number.isInteger(ref));
+      if (legacyFieldOnly) {
+        const requestedSlots = [...new Set(normalized.map(ref => ref.slot))].sort((a, b) => a - b);
+        const plan = this.validTributeSets(playerIndex, card)
+          .find(candidate => candidate.slots.length === requestedSlots.length
+            && candidate.slots.every((slot, i) => slot === requestedSlots[i]));
+        if (plan) normalized = [
+          ...requestedSlots.map(slot => ({ zone: 'field', slot })),
+          ...plan.handIds.map(id => ({ zone: 'hand', id })),
+        ];
+      }
+
+      const keys = normalized.map(ref => ref.zone === 'field' ? `field:${ref.slot}` : `hand:${ref.id}`);
+      if (!normalized.length || new Set(keys).size !== keys.length) throw new Error('生贄の選択が重複しています。');
+
+      const sources = normalized.map(ref => {
+        if (ref.zone === 'field') {
+          if (!Number.isInteger(ref.slot) || ref.slot < 0 || ref.slot >= 5) throw new Error('場の生贄が不正です。');
+          const tribute = p.field[ref.slot];
+          if (!tribute || ![CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(tribute.type)) throw new Error('場では使い魔・魔女だけを生贄にできます。');
+          return { ...ref, card: tribute };
+        }
+        const tribute = p.hand.find(c => c.id === ref.id);
+        if (!tribute || tribute.id === cardId || tribute.type !== CARD_TYPES.FAMILIAR) throw new Error('手札では使い魔だけを生贄にできます。');
+        return { ...ref, card: tribute };
       });
-      this.log(`${p.name}は使い魔・魔女を生贄にした（合計攻撃値 ${total}）`);
+      const total = sources.reduce((sum, source) => sum + (source.card.attack ?? 0), 0);
+      if (total < (card.tributeThreshold ?? 0)) throw new Error('生贄の攻撃力合計が足りません。');
+      const freesField = sources.some(source => source.zone === 'field');
+      if (!p.field.includes(null) && !freesField) throw new Error('場が満杯です。場の使い魔・魔女を1体以上生贄にしてください。');
+
+      for (const source of sources.filter(source => source.zone === 'field')) {
+        p.graveyard.push(p.field[source.slot]);
+        p.field[source.slot] = null;
+      }
+      for (const source of sources.filter(source => source.zone === 'hand')) {
+        const idx = p.hand.findIndex(c => c.id === source.id);
+        const [tribute] = p.hand.splice(idx, 1);
+        p.graveyard.push(tribute);
+      }
+      this.log(`${p.name}は場・手札から生贄を捧げた（合計攻撃値 ${total}）`);
     }
 
-    p.hand.splice(handIndex, 1);
+    const handIndex = p.hand.findIndex(c => c.id === cardId);
+    if (handIndex < 0) throw new Error('Summoned card is no longer in hand.');
+    const [summonedCard] = p.hand.splice(handIndex, 1);
     const destination = p.field.indexOf(null);
-    p.field[destination] = card;
-    card.attackedTurn = null;
+    if (destination < 0) throw new Error('Monster zones are full.');
+    p.field[destination] = summonedCard;
+    summonedCard.attackedTurn = null;
     p.summonedThisTurn = true;
-    this.emit('summon', { player: playerIndex, slot: destination, card: { ...card }, tributes: [...tributeSlots] });
-    this.log(`${p.name}が${card.name}を召喚`);
+    this.emit('summon', { player: playerIndex, slot: destination, card: { ...summonedCard }, tributes: structuredClone(normalized) });
+    this.log(`${p.name}が${summonedCard.name}を召喚`);
     this.passPriorityTo(this.opponent(playerIndex));
     return destination;
   }
@@ -343,7 +410,6 @@ export class GameEngine {
       if (playerIndex === battle.attackerPlayer) battle.attackerBonus += card.value ?? 0;
       else if (playerIndex === battle.defenderPlayer) battle.defenderBonus += card.value ?? 0;
     } else if (card.effect === 'nullifyDamage') {
-      // Legacy field name: true now means the shield prevents battle destruction of this player's familiar.
       battle.damagePrevented[playerIndex] = true;
     }
     this.player(playerIndex).graveyard.push(card);
@@ -390,7 +456,6 @@ export class GameEngine {
 
   takeDeckDamage(playerIndex, damage) {
     const p = this.player(playerIndex);
-    // Move all available cards before ending the duel, even when damage exceeds life.
     const revealed = p.deck.splice(0, Math.max(0, damage));
     const toHandCount = Math.ceil(damage / 3);
     const toHand = revealed.slice(0, toHandCount);
