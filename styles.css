@@ -5,17 +5,17 @@ button { font: inherit; }
 .hud { height: 52px; display:flex; align-items:center; gap:20px; padding:0 18px; background:#171c27; border-bottom:1px solid #384152; position:sticky; top:0; z-index:5; }
 .hud #status { margin-left:auto; letter-spacing:.12em; }
 .board { max-width: 1280px; margin: 0 auto; padding: 12px 220px 12px 12px; min-height: calc(100vh - 52px); }
-.player { position:relative; min-height: 300px; padding: 34px 14px 12px; border:1px solid #2f394b; background:linear-gradient(180deg,#181f2c,#111722); border-radius:16px; }
+.player { position:relative; min-height: 350px; padding: 34px 14px 12px; border:1px solid #2f394b; background:linear-gradient(180deg,#181f2c,#111722); border-radius:16px; }
 .player.top { transform: rotate(180deg); }
 .player.top > * { transform: rotate(180deg); }
 .player-name { position:absolute; top:8px; left:16px; font-weight:700; }
-.field { display:grid; grid-template-columns:repeat(5, minmax(86px, 1fr)); gap:12px; justify-content:center; margin:12px 110px; }
-.zone { aspect-ratio: 3 / 4; border:1px dashed #59657b; border-radius:10px; display:flex; align-items:center; justify-content:center; background:#0c1018; position:relative; }
-.slot-number { opacity:.25; font-size:28px; }
-.hand { display:flex; justify-content:center; align-items:flex-end; gap:8px; min-height:164px; flex-wrap:wrap; }
+.field { display:grid; grid-template-columns:repeat(5, 64px); gap:8px; justify-content:center; width:max-content; margin:8px auto; }
+.zone { width:64px; aspect-ratio: 3 / 4; border:1px dashed #59657b; border-radius:8px; display:flex; align-items:center; justify-content:center; background:#0c1018; position:relative; }
+.slot-number { opacity:.25; font-size:18px; }
+.hand { display:flex; justify-content:center; align-items:flex-end; gap:8px; min-height:198px; flex-wrap:wrap; }
 .card { width:76px; height:106px; border:2px solid #ccd3df; border-radius:8px; background:#f7f7f7; color:#111; display:flex; align-items:center; justify-content:center; text-align:center; font-weight:700; padding:4px; cursor:pointer; background-size:cover; background-position:center; background-repeat:no-repeat; box-shadow:0 4px 12px #0007; }
-.hand .card { width:110px; height:154px; border-radius:10px; }
-.field .card { width:64px; height:90px; font-size:11px; }
+.hand .card { width:136px; height:190px; border-radius:11px; }
+.field .card { width:50px; height:70px; font-size:9px; border-radius:6px; }
 .card.magic { border-color:#7ac7ff; background-color:#dceeff; }
 .card.witch { border-color:#c993ff; background-color:#eadcff; }
 .card.selected { outline:4px solid #ffd86b; transform:translateY(-8px); }
@@ -37,4 +37,4 @@ button { font: inherit; }
 .modal-backdrop.hidden { display:none; }
 .modal { width:min(720px,92vw); max-height:86vh; overflow:auto; background:#19202e; border:1px solid #697891; border-radius:18px; padding:22px; box-shadow:0 20px 80px #000; text-align:center; }
 .modal-card-list { display:flex; flex-wrap:wrap; justify-content:center; gap:10px; margin:16px 0; }
-@media(max-width:900px){ .board{padding-right:12px}.log{position:static;width:auto;margin:8px}.field{margin:12px 80px}.character-panel{width:76px}.card{width:62px;height:88px;font-size:11px}.hand{min-height:132px}.hand .card{width:88px;height:123px}.field .card{width:52px;height:73px;font-size:10px}#actions{right:12px;bottom:12px;max-width:calc(100vw - 24px)} }
+@media(max-width:900px){ .board{padding-right:12px}.log{position:static;width:auto;margin:8px}.player{min-height:300px}.field{grid-template-columns:repeat(5,52px);gap:6px;margin:8px auto}.zone{width:52px}.slot-number{font-size:15px}.character-panel{width:76px}.card{width:62px;height:88px;font-size:11px}.hand{min-height:168px}.hand .card{width:116px;height:162px}.field .card{width:42px;height:59px;font-size:8px}#actions{right:12px;bottom:12px;max-width:calc(100vw - 24px)} }
