@@ -1,7 +1,7 @@
 # Strategy solver
 
-`npm run cfr:solve` runs the current bucketed imperfect-information regret solver.
+`npm run cfr:solve` runs the current imperfect-information strategic regret solver.
 
-It is an approximation, not an exact full-game Nash solver. The information state excludes opponent hand identities and both deck orders, and buckets exact turn/deck counts plus mechanically equivalent cards to improve state reuse. Reports include evaluation coverage (`1 - fallbackRate`); low coverage must not be interpreted as an optimal-strategy result.
+It is an approximation, not an exact full-game Nash solver. Opponent hand identities and both deck orders are excluded. Concrete actions are compressed into strategic choices such as low/high summon, pressure/remove attack, shield, small/large boost, special, and high/low revive. A fine information set is backed off to a coarser policy when an exact strategic state has not been trained.
 
-The GitHub Actions strategy run uses a 50% minimum coverage gate for preliminary interpretation.
+Reports distinguish fine-policy hits, learned backoff hits, and baseline fallback. Preliminary interpretation requires at least 80% learned coverage for both characters; lower coverage must not be presented as an optimal-strategy result.
