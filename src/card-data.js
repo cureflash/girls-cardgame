@@ -17,7 +17,7 @@ export const CHARACTERS = {
   },
 };
 
-const MADOKA_SPRITE = './assets/cards/madoka/cards.webp';
+const MADOKA_SPRITE = './assets/cards/madoka/cards.png';
 
 let serial = 0;
 const uid = (prefix) => `${prefix}-${++serial}`;
