@@ -14,7 +14,7 @@ function description(card) {
   if (card.type === CARD_TYPES.FAMILIAR) return `攻撃力 ${card.attack}。生贄なしで召喚できます。`;
   if (card.effect === 'draw') return 'メインフェイズに2枚ドロー。山札が0枚になると敗北します。';
   if (card.effect === 'boost') return `戦闘中の自分の使い魔・魔女の攻撃力を＋${card.value}。この戦闘のみ有効。`;
-  return 'この戦闘で自分が受けるダメージを0にします。カードの破壊は防ぎません。';
+  return 'この戦闘で自分の使い魔は戦闘では破壊されません。発動した時点でチェーンを終了します。戦闘ダメージは通常通り受けます。';
 }
 function clear() { selection = null; tributes = []; attacker = null; target = null; }
 function humanTurn() { return mode === 'local' || adapter.currentPlayer() === human; }
@@ -76,7 +76,7 @@ function cardButton(card, owner, zone, slot) {
   const visual = node('div', 'card-visual'), img = node('img', 'card-image');
   img.src = card.image; img.alt = ''; img.draggable = false;
   visual.append(img);
-  const caption = node('div', 'card-caption'); caption.append(node('span', 'card-name', card.name), node('b', 'card-value', card.attack ? `ATK ${card.attack}` : card.effect === 'boost' ? `＋${card.value}` : card.effect === 'draw' ? '2枚ドロー' : 'ダメージ 0'));
+  const caption = node('div', 'card-caption'); caption.append(node('span', 'card-name', card.name), node('b', 'card-value', card.attack ? `ATK ${card.attack}` : card.effect === 'boost' ? `＋${card.value}` : card.effect === 'draw' ? '2枚ドロー' : '破壊無効'));
   b.append(visual, caption);
   const selected = zone === 'hand' ? selection?.owner === owner && selection?.id === card.id : attacker?.owner === owner && attacker.slot === slot;
   b.classList.toggle('selected', selected);
