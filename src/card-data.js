@@ -1,170 +1,39 @@
 import { CARD_TYPES } from './game-engine.js';
 
 export const CHARACTERS = {
+  madoka: { id: 'madoka', name: '鹿目まどか', passive: '戦闘ダメージを1軽減', special: 'プルウィア☆マギカ', image: './assets/characters/madoka.webp' },
+  mami: { id: 'mami', name: '巴マミ', passive: '初期手札が1枚多い', special: 'ティロ・フィナーレ', image: './assets/characters/mami.webp' },
+};
+const SKINS = {
   madoka: {
-    id: 'madoka',
-    name: '鹿目まどか',
-    passive: '受ける戦闘ダメージを常に1軽減',
-    special: 'プルウィア☆マギカ',
-    image: './assets/characters/madoka.webp',
+    familiars: [['butterfly', '薔薇園の魔女の使い魔'], ['legs', '委員長の魔女の使い魔']],
+    witches: [['rose_garden_8', '薔薇園の魔女', 8, 2], ['class_representative_8', '委員長の魔女', 8, 2], ['mermaid_a_10', '人魚の魔女 A', 10, 1], ['mermaid_b_10', '人魚の魔女 B', 10, 1], ['salvation_13', '救済の魔女', 13, 1]],
   },
   mami: {
-    id: 'mami',
-    name: '巴マミ',
-    passive: '初期手札+1枚',
-    special: 'ティロ・フィナーレ',
-    image: './assets/characters/mami.webp',
+    familiars: [['nurse', 'お菓子の魔女の使い魔'], ['vine', '影の魔女の使い魔']],
+    // 芸術家の魔女の原寸画像は次の画像コミットで差し替える。それまでは欠損を避けるため既存画像を使う。
+    witches: [['shadow_8', '影の魔女', 8, 2], ['shadow_8', '芸術家の魔女', 8, 2], ['candy_a_10', 'お菓子の魔女 A', 10, 1], ['candy_b_10', 'お菓子の魔女 B', 10, 1], ['walpurgis_13', 'ワルプルギスの夜', 13, 1]],
   },
 };
 
-const MADOKA = './assets/cards/madoka/';
-const MAMI = './assets/cards/mami/';
-
-let serial = 0;
-const uid = (prefix) => `${prefix}-${++serial}`;
-
-function familiar({ code, name, attack, image }) {
-  return {
-    id: uid(code),
-    code,
-    name,
-    type: CARD_TYPES.FAMILIAR,
-    attack,
-    rank: attack,
-    image,
+export function createDeck(characterId) {
+  const skin = SKINS[characterId];
+  if (!skin) throw new Error(`Unknown character: ${characterId}`);
+  const cards = [];
+  const add = (code, data, copies = 1) => {
+    for (let n = 0; n < copies; n++) cards.push({ id: `${characterId}-${cards.length + 1}`, code, ...data });
   };
+  const image = file => `./assets/cards/${characterId}/${file}.png?v=original1`;
+  for (const [family, name] of skin.familiars) {
+    for (const attack of [3, 4, 5]) add(`familiar-${family}-${attack}`, { name, type: CARD_TYPES.FAMILIAR, attack, rank: attack, image: image(`familiar_${family}_${attack}`) }, 2);
+  }
+  for (const [code, name, attack, copies] of skin.witches) add(`witch-${code}`, { name, type: CARD_TYPES.WITCH, attack, rank: attack, tributeThreshold: attack, image: image(`witch_${code}`) }, copies);
+  const magic = (effect, name, value, file, copies, chainable) => add(`magic-${effect}-${value}`, { name, type: CARD_TYPES.MAGIC, effect, value, chainable, image: `./assets/cards/madoka/magic_${file}.png` }, copies);
+  for (const [value, copies] of [[2, 3], [3, 3], [5, 1]]) magic('boost', `攻撃力＋${value}`, value, `attack_up_${value}`, copies, true);
+  magic('draw', 'ドロー魔法', 2, 'draw_two', 1, false);
+  magic('nullifyDamage', '盾', 0, 'shield', 3, true);
+  return cards; // 30 = familiars 12 + witches 7 + magic 11
 }
-
-function witch({ code, name, attack, image }) {
-  return {
-    id: uid(code),
-    code,
-    name,
-    type: CARD_TYPES.WITCH,
-    attack,
-    tributeThreshold: attack,
-    rank: attack,
-    image,
-  };
-}
-
-function boost(value, image) {
-  return {
-    id: uid(`boost-${value}`),
-    code: `boost-${value}`,
-    name: `こうげきアップ +${value}`,
-    type: CARD_TYPES.MAGIC,
-    chainable: true,
-    effect: 'boost',
-    value,
-    image,
-  };
-}
-
-function drawTwo(image) {
-  return {
-    id: uid('draw-2'),
-    code: 'draw-2',
-    name: 'しあわせのカップ',
-    type: CARD_TYPES.MAGIC,
-    chainable: false,
-    effect: 'draw',
-    value: 2,
-    image,
-  };
-}
-
-function shield(image) {
-  return {
-    id: uid('shield'),
-    code: 'shield',
-    name: 'まもりのたて',
-    type: CARD_TYPES.MAGIC,
-    chainable: true,
-    effect: 'nullifyDamage',
-    value: 0,
-    image,
-  };
-}
-
-function createMadokaFamiliars() {
-  return [
-    familiar({ code: 'familiar-cotton-3', name: '使い魔A', attack: 3, image: `${MADOKA}familiar_butterfly_3.png` }),
-    familiar({ code: 'familiar-cotton-4', name: '使い魔A', attack: 4, image: `${MADOKA}familiar_butterfly_4.png` }),
-    familiar({ code: 'familiar-cotton-5', name: '使い魔A', attack: 5, image: `${MADOKA}familiar_butterfly_5.png` }),
-    familiar({ code: 'familiar-nurse-3', name: '使い魔B', attack: 3, image: `${MADOKA}familiar_butterfly_3.png` }),
-    familiar({ code: 'familiar-nurse-4', name: '使い魔B', attack: 4, image: `${MADOKA}familiar_butterfly_4.png` }),
-    familiar({ code: 'familiar-nurse-5', name: '使い魔B', attack: 5, image: `${MADOKA}familiar_butterfly_5.png` }),
-    familiar({ code: 'familiar-vine-3', name: '使い魔C', attack: 3, image: `${MADOKA}familiar_legs_3.png` }),
-    familiar({ code: 'familiar-vine-4', name: '使い魔C', attack: 4, image: `${MADOKA}familiar_legs_4.png` }),
-    familiar({ code: 'familiar-vine-5', name: '使い魔C', attack: 5, image: `${MADOKA}familiar_legs_5.png` }),
-    familiar({ code: 'familiar-legs-3', name: '使い魔D', attack: 3, image: `${MADOKA}familiar_legs_3.png` }),
-    familiar({ code: 'familiar-legs-4', name: '使い魔D', attack: 4, image: `${MADOKA}familiar_legs_4.png` }),
-    familiar({ code: 'familiar-legs-5', name: '使い魔D', attack: 5, image: `${MADOKA}familiar_legs_5.png` }),
-  ];
-}
-
-function createMamiFamiliars() {
-  return [
-    familiar({ code: 'familiar-cotton-3', name: '使い魔A', attack: 3, image: `${MAMI}familiar_nurse_3.png` }),
-    familiar({ code: 'familiar-cotton-4', name: '使い魔A', attack: 4, image: `${MAMI}familiar_nurse_4.png` }),
-    familiar({ code: 'familiar-cotton-5', name: '使い魔A', attack: 5, image: `${MAMI}familiar_nurse_5.png` }),
-    familiar({ code: 'familiar-nurse-3', name: '使い魔B', attack: 3, image: `${MAMI}familiar_nurse_3.png` }),
-    familiar({ code: 'familiar-nurse-4', name: '使い魔B', attack: 4, image: `${MAMI}familiar_nurse_4.png` }),
-    familiar({ code: 'familiar-nurse-5', name: '使い魔B', attack: 5, image: `${MAMI}familiar_nurse_5.png` }),
-    familiar({ code: 'familiar-vine-3', name: '使い魔C', attack: 3, image: `${MAMI}familiar_vine_3.png` }),
-    familiar({ code: 'familiar-vine-4', name: '使い魔C', attack: 4, image: `${MAMI}familiar_vine_4.png` }),
-    familiar({ code: 'familiar-vine-5', name: '使い魔C', attack: 5, image: `${MAMI}familiar_vine_5.png` }),
-    familiar({ code: 'familiar-legs-3', name: '使い魔D', attack: 3, image: `${MAMI}familiar_vine_3.png` }),
-    familiar({ code: 'familiar-legs-4', name: '使い魔D', attack: 4, image: `${MAMI}familiar_vine_4.png` }),
-    familiar({ code: 'familiar-legs-5', name: '使い魔D', attack: 5, image: `${MAMI}familiar_vine_5.png` }),
-  ];
-}
-
-function createMadokaWitches() {
-  return [
-    witch({ code: 'witch-8-a', name: '8の魔女A', attack: 8, image: `${MADOKA}witch_rose_garden_8.png` }),
-    witch({ code: 'witch-8-a', name: '8の魔女A', attack: 8, image: `${MADOKA}witch_rose_garden_8.png` }),
-    witch({ code: 'witch-8-b', name: '8の魔女B', attack: 8, image: `${MADOKA}witch_class_representative_8.png` }),
-    witch({ code: 'witch-8-b', name: '8の魔女B', attack: 8, image: `${MADOKA}witch_class_representative_8.png` }),
-    witch({ code: 'witch-mermaid-a', name: '人魚の魔女', attack: 10, image: `${MADOKA}witch_mermaid_a_10.png` }),
-    witch({ code: 'witch-mermaid-b', name: '人魚の魔女', attack: 10, image: `${MADOKA}witch_mermaid_b_10.png` }),
-  ];
-}
-
-function createMamiWitches() {
-  return [
-    witch({ code: 'witch-8-a', name: '8の魔女A', attack: 8, image: `${MAMI}witch_shadow_8.png` }),
-    witch({ code: 'witch-8-a', name: '8の魔女A', attack: 8, image: `${MAMI}witch_shadow_8.png` }),
-    witch({ code: 'witch-8-b', name: '8の魔女B', attack: 8, image: `${MAMI}witch_shadow_8.png` }),
-    witch({ code: 'witch-8-b', name: '8の魔女B', attack: 8, image: `${MAMI}witch_shadow_8.png` }),
-    witch({ code: 'witch-mermaid-a', name: '人魚の魔女', attack: 10, image: `${MAMI}witch_candy_a_10.png` }),
-    witch({ code: 'witch-mermaid-b', name: '人魚の魔女', attack: 10, image: `${MAMI}witch_candy_b_10.png` }),
-  ];
-}
-
-function createMagicCards() {
-  return [
-    boost(2, `${MADOKA}magic_attack_up_2.png`), boost(2, `${MADOKA}magic_attack_up_2.png`), boost(2, `${MADOKA}magic_attack_up_2.png`),
-    boost(3, `${MADOKA}magic_attack_up_3.png`), boost(3, `${MADOKA}magic_attack_up_3.png`), boost(3, `${MADOKA}magic_attack_up_3.png`),
-    boost(5, `${MADOKA}magic_attack_up_5.png`),
-    drawTwo(`${MADOKA}magic_draw_two.png`), drawTwo(`${MADOKA}magic_draw_two.png`),
-    shield(`${MADOKA}magic_shield.png`), shield(`${MADOKA}magic_shield.png`), shield(`${MADOKA}magic_shield.png`),
-  ];
-}
-
-// 30枚固定: 使い魔12 / 魔女6 / 魔法12。
-// まどかとマミはカード性能と枚数を共通化し、モンスター画像だけ別スキンにする。
-export function createMadokaDeck() {
-  serial = 0;
-  return [...createMadokaFamiliars(), ...createMadokaWitches(), ...createMagicCards()];
-}
-
-export function createMamiDeck() {
-  serial = 0;
-  return [...createMamiFamiliars(), ...createMamiWitches(), ...createMagicCards()];
-}
-
-export function createPrototypeDeck() {
-  return createMadokaDeck();
-}
+export const createMadokaDeck = () => createDeck('madoka');
+export const createMamiDeck = () => createDeck('mami');
+export const createPrototypeDeck = createMadokaDeck;

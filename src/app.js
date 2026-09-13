@@ -1,335 +1,235 @@
 import { GameEngine, CARD_TYPES, PHASES } from './game-engine.js';
-import { CHARACTERS, createMadokaDeck, createMamiDeck } from './card-data.js';
+import { CHARACTERS, createDeck } from './card-data.js';
+import { RLAdapter } from './rl-adapter.js';
+import { chooseBaselineAction } from './baseline-ai.js';
+import { Policy } from './policy.js';
 
-const $ = (sel) => document.querySelector(sel);
-let engine;
-let selectedHandCard = null;
-let selectedTributes = [];
-let selectedAttacker = null;
-
+const $ = selector => document.querySelector(selector);
+let engine, adapter, human = 0, mode = 'cpu', policy = null, timer, generation = 0, eventCursor = 0;
+let selection = null, tributes = [], attacker = null, target = null;
+const node = (tag, className, text) => { const el = document.createElement(tag); el.className = className; if (text !== undefined) el.textContent = text; return el; };
+const typeName = card => ({ familiar: '使い魔', witch: '魔女', magic: '魔法' })[card.type];
+function description(card) {
+  if (card.type === CARD_TYPES.WITCH) return `攻撃力 ${card.attack}。生贄の攻撃力合計 ${card.tributeThreshold} 以上で召喚。`;
+  if (card.type === CARD_TYPES.FAMILIAR) return `攻撃力 ${card.attack}。生贄なしで召喚できます。`;
+  if (card.effect === 'draw') return 'メインフェイズに2枚ドロー。山札が0枚になると敗北します。';
+  if (card.effect === 'boost') return `戦闘中の自分の使い魔・魔女の攻撃力を＋${card.value}。この戦闘のみ有効。`;
+  return 'この戦闘で自分が受けるダメージを0にします。カードの破壊は防ぎません。';
+}
+function clear() { selection = null; tributes = []; attacker = null; target = null; }
+function humanTurn() { return mode === 'local' || adapter.currentPlayer() === human; }
+function notify(text = '') { $('#notice').textContent = text; $('#notice').hidden = !text; }
+function showDetail(card) {
+  const root = $('#card-detail');
+  root.replaceChildren();
+  const img = node('img', 'detail-image'); img.src = card.image; img.alt = card.name;
+  root.append(img, node('small', 'card-type', typeName(card)), node('h3', '', card.name), node('p', '', description(card)));
+}
 function start() {
-  engine = new GameEngine({
-    players: [
-      { id: 'p1', name: 'P1 まどか', character: CHARACTERS.madoka },
-      { id: 'p2', name: 'P2 マミ', character: CHARACTERS.mami },
-    ],
-    decks: [createMadokaDeck(), createMamiDeck()],
-  });
+  clearTimeout(timer); generation++; clear(); eventCursor = 0; notify();
+  const chosen = $('#character').value;
+  human = $('#seat').value === 'second' ? 1 : 0;
+  mode = $('#mode').value;
+  const ids = human === 0 ? [chosen, chosen === 'madoka' ? 'mami' : 'madoka'] : [chosen === 'madoka' ? 'mami' : 'madoka', chosen];
+  engine = new GameEngine({ players: ids.map((id, i) => ({ id: `p${i}`, name: CHARACTERS[id].name, character: CHARACTERS[id] })), decks: ids.map(createDeck) });
+  adapter = new RLAdapter(engine);
+  $('#card-detail').replaceChildren(node('p', 'muted', 'カードに触れると、ここに詳細を表示します。'), node('div', 'detail-placeholder', '✦'));
+  finishAction();
+}
+function perform(fn) {
+  try { notify(); fn(); clear(); finishAction(); }
+  catch (error) { notify(error.message); render(); }
+}
+function finishAction() {
+  // Main-phase actions have no available opponent response. Return priority automatically.
+  const s = engine.state;
+  if (s.phase !== PHASES.GAME_OVER && !s.pendingDecision && s.priorityPlayer !== s.activePlayer) engine.passPriorityTo(s.activePlayer);
+  const events = s.events.slice(eventCursor); eventCursor = s.events.length;
   render();
+  for (const detail of events) window.dispatchEvent(new CustomEvent('duel:event', { detail }));
+  scheduleAI();
 }
-
-function label(card) {
-  if (!card) return '';
-  if (card.type === CARD_TYPES.FAMILIAR) return `${card.name}\nATK ${card.attack}`;
-  if (card.type === CARD_TYPES.WITCH) return `${card.name}\nATK ${card.attack}\n生贄合計≥${card.tributeThreshold}`;
-  if (card.effect === 'boost') return `${card.name}\n攻撃力+${card.value}`;
-  if (card.effect === 'nullifyDamage') return `${card.name}\nダメージ0`;
-  if (card.effect === 'draw') return `${card.name}\n${card.value}枚ドロー`;
-  return card.name;
+function scheduleAI() {
+  clearTimeout(timer);
+  if (engine.state.phase === PHASES.GAME_OVER || humanTurn()) return;
+  const duel = generation;
+  timer = setTimeout(() => {
+    if (duel !== generation) return;
+    perform(() => {
+      const player = adapter.currentPlayer(), legal = adapter.legalActions(player);
+      let action;
+      try { action = policy ? policy.choose(adapter.observation(player), legal) : chooseBaselineAction(adapter, player); }
+      catch (error) { policy = null; $('#ai-name').textContent = '基本AI'; notify(`${error.message} 基本AIで続けます。`); action = chooseBaselineAction(adapter, player); }
+      adapter.applyAction(action, player);
+    });
+  }, 450);
 }
-
-function applyCardImage(el, card) {
-  if (!card.image) return;
-  if (Number.isInteger(card.spriteIndex)) {
-    const col = card.spriteIndex % 5;
-    const row = Math.floor(card.spriteIndex / 5);
-    el.style.backgroundImage = `url('${card.image}')`;
-    el.style.backgroundSize = '500% 500%';
-    el.style.backgroundPosition = `${col * 25}% ${row * 25}%`;
-    el.classList.add('has-image');
-    return;
-  }
-
-  const img = new Image();
-  img.onload = () => {
-    el.style.backgroundImage = `url('${card.image}')`;
-    el.classList.add('has-image');
+function button(text, fn, className = 'primary', disabled = false) {
+  const b = node('button', className, text); b.disabled = disabled; b.onclick = fn; return b;
+}
+function selectedCard() { return selection ? engine.player(selection.owner).hand.find(c => c.id === selection.id) : null; }
+function attackable(owner, slot) { return [...Array(5).keys(), null].some(t => engine.canAttack(owner, slot, t)); }
+function cardButton(card, owner, zone, slot) {
+  const b = node('button', `card ${card.type}`);
+  b.dataset.cardId = card.id;
+  b.setAttribute('aria-label', `${card.name}、${description(card)}`);
+  const visual = node('div', 'card-visual'), img = node('img', 'card-image');
+  img.src = card.image; img.alt = ''; img.draggable = false;
+  visual.append(img);
+  const caption = node('div', 'card-caption'); caption.append(node('span', 'card-name', card.name), node('b', 'card-value', card.attack ? `ATK ${card.attack}` : card.effect === 'boost' ? `＋${card.value}` : card.effect === 'draw' ? '2枚ドロー' : 'ダメージ 0'));
+  b.append(visual, caption);
+  const selected = zone === 'hand' ? selection?.owner === owner && selection?.id === card.id : attacker?.owner === owner && attacker.slot === slot;
+  b.classList.toggle('selected', selected);
+  b.setAttribute('aria-pressed', String(selected));
+  b.onmouseenter = () => showDetail(card); b.onfocus = () => showDetail(card);
+  b.onclick = () => {
+    showDetail(card);
+    if (!humanTurn() || engine.state.pendingDecision || engine.state.phase === PHASES.GAME_OVER) return;
+    const player = adapter.currentPlayer();
+    if (zone === 'hand' && owner === player) { selection = { owner, id: card.id }; tributes = []; attacker = null; target = null; }
+    if (zone === 'field' && owner === player) {
+      const handCard = selectedCard();
+      if (handCard?.type === CARD_TYPES.WITCH && engine.canSummon(player, handCard.id)) tributes = tributes.includes(slot) ? tributes.filter(s => s !== slot) : [...tributes, slot];
+      else if (attackable(owner, slot)) { selection = null; tributes = []; attacker = { owner, slot }; target = null; }
+    } else if (zone === 'field' && attacker && owner !== attacker.owner && engine.canAttack(attacker.owner, attacker.slot, slot)) target = slot;
+    render();
   };
-  img.src = card.image;
-}
-
-function renderCard(card, { owner, zone, slot = null } = {}) {
-  const el = document.createElement('button');
-  el.className = `card ${card.type}`;
-  el.dataset.cardId = card.id;
-  el.title = label(card).replaceAll('\n', ' / ');
-  el.setAttribute('aria-label', el.title);
-  el.innerHTML = `<span>${label(card).replaceAll('\n', '<br>')}</span>`;
-  applyCardImage(el, card);
-
-  if (zone === 'hand') {
-    el.onclick = () => {
-      selectedHandCard = card.id;
-      selectedTributes = [];
-      render();
-    };
-    if (selectedHandCard === card.id) el.classList.add('selected');
-  } else if (zone === 'field') {
-    el.onclick = () => onFieldClick(owner, slot);
-    if (selectedAttacker?.owner === owner && selectedAttacker?.slot === slot) el.classList.add('selected');
-    if (selectedTributes.includes(slot) && owner === engine.state.priorityPlayer) el.classList.add('tribute');
+  if (humanTurn() && !engine.state.pendingDecision) {
+    const canPlay = zone === 'hand' && (engine.canSummon(owner, card.id) || engine.canActivateMainMagic(owner, card.id));
+    const canAttack = zone === 'field' && attackable(owner, slot);
+    const canTarget = zone === 'field' && attacker && owner !== attacker.owner && engine.canAttack(attacker.owner, attacker.slot, slot);
+    b.classList.toggle('playable', canPlay || canAttack);
+    b.classList.toggle('targetable', !!canTarget);
+    b.classList.toggle('target-selected', !!canTarget && target === slot);
+    b.classList.toggle('tribute', zone === 'field' && owner === selection?.owner && tributes.includes(slot));
+    if (canAttack) visual.append(node('span', 'card-badge', '攻撃可能'));
   }
-  return el;
-}
-
-function clearSelections() {
-  selectedHandCard = null;
-  selectedTributes = [];
-  selectedAttacker = null;
-}
-
-function render() {
-  const s = engine.state;
-  $('#turn').textContent = `TURN ${s.turn} / 優先権: ${engine.player(s.priorityPlayer).name}`;
-  $('#status').textContent = s.phase === PHASES.GAME_OVER ? `${engine.player(s.winner).name} WIN` : s.phase;
-  renderPlayer(1, '#top-player');
-  renderPlayer(0, '#bottom-player');
-  renderActions();
-  renderChain();
-  renderLog();
-  renderModal();
-}
-
-function renderPlayer(index, selector) {
-  const p = engine.player(index);
-  const root = $(selector);
-  root.querySelector('.player-name').textContent = `${p.name} / 山札 ${p.deck.length} / 手札 ${p.hand.length} / 墓地 ${p.graveyard.length}`;
-  root.querySelector('.character-name').textContent = p.character.name;
-  root.querySelector('.passive').textContent = p.character.passive;
-  root.querySelector('.special-name').textContent = p.character.special;
-
-  const charImg = root.querySelector('.character-image');
-  charImg.style.display = '';
-  charImg.src = p.character.image;
-  charImg.onerror = () => { charImg.style.display = 'none'; };
-
-  const field = root.querySelector('.field');
-  field.innerHTML = '';
-  p.field.forEach((card, slot) => {
-    const zone = document.createElement('div');
-    zone.className = 'zone';
-    if (card) zone.appendChild(renderCard(card, { owner: index, zone: 'field', slot }));
-    else zone.innerHTML = `<span class="slot-number">${slot + 1}</span>`;
-    field.appendChild(zone);
-  });
-
-  const hand = root.querySelector('.hand');
-  hand.innerHTML = '';
-  p.hand.forEach(card => hand.appendChild(renderCard(card, { owner: index, zone: 'hand' })));
-}
-
-function onFieldClick(owner, slot) {
-  const s = engine.state;
-  const priority = s.priorityPlayer;
-
-  if (owner === priority && priority === s.activePlayer) {
-    const chosen = engine.player(owner).field[slot];
-    if (!chosen) return;
-
-    if (selectedHandCard) {
-      const handCard = engine.player(priority).hand.find(c => c.id === selectedHandCard);
-      if (
-        handCard?.type === CARD_TYPES.WITCH
-        && chosen.type === CARD_TYPES.FAMILIAR
-        && engine.canSummon(priority, handCard.id)
-      ) {
-        selectedTributes = selectedTributes.includes(slot)
-          ? selectedTributes.filter(x => x !== slot)
-          : [...selectedTributes, slot];
-        render();
-        return;
-      }
-    }
-
-    const opponent = engine.player(engine.opponent(owner));
-    const canAttackFromSlot = opponent.field.some((card, targetSlot) =>
-      !!card && engine.canAttack(owner, slot, targetSlot)
-    );
-    if (canAttackFromSlot) {
-      selectedAttacker = { owner, slot };
-      render();
-    }
-    return;
-  }
-
-  if (selectedAttacker && selectedAttacker.owner === priority) {
-    try {
-      if (!engine.canAttack(priority, selectedAttacker.slot, slot)) return;
-      engine.attack(priority, selectedAttacker.slot, slot);
-      clearSelections();
-      render();
-    } catch (e) {
-      alert(e.message);
-    }
-  }
-}
-
-function renderActions() {
-  const s = engine.state;
-  const root = $('#actions');
-  root.innerHTML = '';
-  if (s.phase === PHASES.GAME_OVER || s.pendingDecision) return;
-
-  const p = engine.player(s.priorityPlayer);
-  const card = p.hand.find(c => c.id === selectedHandCard);
-
-  if (card && engine.canSummon(s.priorityPlayer, card.id)) {
-    root.appendChild(actionButton('召喚', () => {
-      try {
-        engine.summon(s.priorityPlayer, card.id, selectedTributes);
-        selectedHandCard = null;
-        selectedTributes = [];
-        render();
-      } catch (e) {
-        alert(e.message);
-      }
-    }));
-  }
-
-  if (card && engine.canActivateMainMagic(s.priorityPlayer, card.id)) {
-    root.appendChild(actionButton('発動', () => {
-      try {
-        engine.activateMainMagic(s.priorityPlayer, card.id);
-        selectedHandCard = null;
-        render();
-      } catch (e) {
-        alert(e.message);
-      }
-    }));
-  }
-
-  if (engine.canEnterBattlePhase(s.priorityPlayer)) {
-    root.appendChild(actionButton('バトルフェイズへ', () => {
-      try {
-        engine.enterBattlePhase(s.priorityPlayer);
-        clearSelections();
-        render();
-      } catch (e) {
-        alert(e.message);
-      }
-    }));
-  }
-
-  if (engine.canUseSpecial(s.priorityPlayer)) {
-    root.appendChild(actionButton(p.character.special, () => {
-      try {
-        engine.activateSpecial(s.priorityPlayer);
-        clearSelections();
-        render();
-      } catch (e) {
-        alert(e.message);
-      }
-    }, 'special-button'));
-  }
-
-  if (engine.canContinueBattlePhase(s.priorityPlayer)) {
-    root.appendChild(actionButton('バトル開始', () => {
-      try {
-        engine.continueBattlePhase(s.priorityPlayer);
-        clearSelections();
-        render();
-      } catch (e) {
-        alert(e.message);
-      }
-    }));
-  }
-
-  if (engine.canEndTurn(s.priorityPlayer)) {
-    root.appendChild(actionButton('ターン終了', () => {
-      try {
-        engine.endTurn(s.priorityPlayer);
-        clearSelections();
-        render();
-      } catch (e) {
-        alert(e.message);
-      }
-    }));
-  } else if (s.priorityPlayer !== s.activePlayer) {
-    root.appendChild(actionButton('優先権を返す', () => {
-      try {
-        engine.passPriorityTo(s.activePlayer);
-        render();
-      } catch (e) {
-        alert(e.message);
-      }
-    }));
-  }
-}
-
-function actionButton(text, fn, className = '') {
-  const b = document.createElement('button');
-  b.className = `action ${className}`;
-  b.textContent = text;
-  b.onclick = fn;
+  if (zone === 'field' && card.attackedTurn === engine.state.turn) visual.append(node('span', 'card-badge used', '攻撃済み'));
   return b;
 }
-
-function renderChain() {
-  const root = $('#chain-stack');
-  root.innerHTML = '';
-  engine.state.chain.forEach((item, i) => {
-    const div = document.createElement('div');
-    div.className = 'chain-item';
-    div.textContent = `CHAIN ${i + 1}  ${engine.player(item.player).name}: ${item.card.name}`;
-    root.appendChild(div);
-  });
-}
-
-function renderLog() {
-  $('#log').innerHTML = engine.state.logs.slice(-10).reverse().map(x => `<div>${x}</div>`).join('');
-}
-
-function renderModal() {
-  const d = engine.state.pendingDecision;
-  const backdrop = $('#modal-backdrop');
-  const modal = $('#modal');
-  if (!d) {
-    backdrop.classList.add('hidden');
-    return;
+function renderPlayer(index, selector) {
+  const p = engine.player(index), root = $(selector), s = engine.state;
+  root.replaceChildren(); root.dataset.character = p.character.id;
+  root.classList.toggle('active', s.activePlayer === index);
+  const head = node('div', 'player-head');
+  const name = node('div', 'player-identity');
+  name.append(node('small', '', mode === 'cpu' ? index === human ? 'YOU' : 'AI' : `PLAYER ${index + 1}`), node('h2', '', p.name), node('span', 'passive', p.character.passive));
+  const stats = node('div', 'stats');
+  const life = node('div', 'life'); life.append(node('small', '', '山札 / LIFE'), node('b', '', String(p.deck.length)));
+  const grave = button(`墓地 ${p.graveyard.length}`, () => showGrave(index), 'quiet');
+  stats.append(node('span', 'hand-count', `手札 ${p.hand.length}`), grave, life); head.append(name, stats);
+  root.append(head);
+  if (selector === '#top-player') {
+    const backs = node('div', 'hidden-hand'); backs.setAttribute('aria-label', `非公開の手札 ${p.hand.length}枚`);
+    for (let i = 0; i < Math.min(p.hand.length, 12); i++) backs.append(node('span', 'card-back', '✦'));
+    if (p.hand.length > 12) backs.append(node('span', '', `＋${p.hand.length - 12}`));
+    root.append(backs);
   }
-  backdrop.classList.remove('hidden');
-  const p = engine.player(d.player);
-  modal.innerHTML = `<h2>${p.name}</h2>`;
-
+  const field = node('div', 'field');
+  p.field.forEach((card, slot) => { const zone = node('div', 'zone'); zone.dataset.slot = slot; zone.append(card ? cardButton(card, index, 'field', slot) : node('span', 'empty-slot', `✧ ${slot + 1}`)); field.append(zone); });
+  root.append(field);
+  if (selector === '#bottom-player') {
+    const info = node('div', 'hand-heading');
+    info.append(node('b', '', '手札'), node('span', '', p.summonedThisTurn && index === s.activePlayer ? 'このターンの召喚は使用済み' : '召喚は1ターンに1体'), node('span', '', `必殺技：${p.specialUsed ? '使用済み' : '未使用'}`));
+    const hand = node('div', 'hand'); p.hand.forEach(card => hand.append(cardButton(card, index, 'hand')));
+    root.append(info, hand);
+  }
+}
+function renderActions() {
+  const s = engine.state, p = adapter.currentPlayer(), card = selectedCard(), root = $('#actions');
+  root.replaceChildren();
+  let hint = '';
+  if (s.phase === PHASES.GAME_OVER) { hint = `${engine.player(s.winner).name}の勝利！`; root.append(button('もう一度対戦', start)); }
+  else if (!humanTurn()) hint = `${engine.player(p).name}が考えています…`;
+  else if (s.pendingDecision) hint = '発動するカードを選んでください。';
+  else {
+    if (s.phase === PHASES.MAIN) {
+      hint = engine.player(p).summonedThisTurn ? '召喚済みです。魔法を使うか、バトルへ進めます。' : '光っている手札を選んで召喚・発動できます。';
+      if (card) {
+        hint = `${card.name}：${description(card)}`;
+        if (card.type !== CARD_TYPES.MAGIC) {
+          const total = tributes.reduce((n, slot) => n + (engine.player(p).field[slot]?.attack || 0), 0);
+          if (card.type === CARD_TYPES.WITCH && engine.canSummon(p, card.id)) hint = `生贄を場から選択：合計 ${total} / 必要 ${card.tributeThreshold} 以上`;
+          root.append(button(card.type === CARD_TYPES.WITCH ? '生贄を捧げて召喚' : '召喚する', () => perform(() => engine.summon(p, card.id, tributes)), 'primary', !engine.canSummon(p, card.id) || (card.type === CARD_TYPES.WITCH && total < card.tributeThreshold)));
+        } else if (card.effect === 'draw') root.append(button('魔法を発動', () => perform(() => engine.activateMainMagic(p, card.id)), 'primary', !engine.canActivateMainMagic(p, card.id)));
+      }
+      root.append(button('バトルフェイズへ', () => perform(() => engine.enterBattlePhase(p)), 'secondary'));
+    }
+    if (s.phase === PHASES.BATTLE_START) {
+      const self = engine.player(p);
+      hint = self.specialUsed ? '必殺技は使用済みです。バトルを始めましょう。' : '必殺技を使うと、このターンのバトルはスキップします。';
+      root.append(button(self.character.special, () => perform(() => engine.activateSpecial(p)), 'special', !engine.canUseSpecial(p)), button('バトル開始', () => perform(() => engine.continueBattlePhase(p))));
+    }
+    if (s.phase === PHASES.BATTLE) {
+      hint = s.turn === 1 ? '先攻の初ターンは攻撃できません。ターンを終了してください。' : '攻撃可能な自分のカードを選んでください。';
+      if (attacker) {
+        hint = target === null ? '相手のカードを選ぶか、相手の場が空なら直接攻撃できます。' : `${engine.player(1 - p).field[target].name}に攻撃します。`;
+        if (engine.canAttack(p, attacker.slot, null)) root.append(button('直接攻撃する', () => perform(() => engine.attack(p, attacker.slot, null))));
+        else root.append(button('攻撃する', () => perform(() => engine.attack(p, attacker.slot, target)), 'primary', target === null));
+        root.append(button('選択を解除', () => { clear(); render(); }, 'quiet'));
+      }
+    }
+    if (engine.canEndTurn(p)) root.append(button('ターン終了', () => perform(() => engine.endTurn(p)), 'quiet'));
+  }
+  $('#hint').textContent = hint;
+}
+function render() {
+  const s = engine.state;
+  $('#turn').textContent = `TURN ${String(s.turn).padStart(2, '0')}`;
+  $('#turn-name').textContent = s.phase === PHASES.GAME_OVER ? 'デュエル終了' : `${engine.player(s.activePlayer).name}のターン`;
+  const bottom = mode === 'local' ? adapter.currentPlayer() : human;
+  renderPlayer(1 - bottom, '#top-player'); renderPlayer(bottom, '#bottom-player');
+  for (const el of $('#phases').children) { const active = el.dataset.phase === (s.phase === PHASES.CHAIN ? PHASES.BATTLE : s.phase); el.classList.toggle('current', active); if (active) el.setAttribute('aria-current', 'step'); else el.removeAttribute('aria-current'); }
+  renderActions();
+  $('#chain-stack').replaceChildren(...s.chain.map((item, i) => node('span', 'chain-item', `CHAIN ${i + 1} · ${item.card.name}`)));
+  $('#log').replaceChildren(...s.logs.slice(-30).reverse().map(text => node('li', '', text)));
+  renderDecision();
+}
+function renderDecision() {
+  const dialog = $('#decision'), d = engine.state.pendingDecision;
+  if (!d || !humanTurn()) { if (dialog.open) dialog.close(); return; }
+  const root = $('#modal'), p = engine.player(d.player);
+  root.replaceChildren();
+  const heading = node('h2', '', d.type === 'CHAIN_RESPONSE' ? '魔法で応じますか？' : '蘇生するカードを選択'); heading.id = 'decision-title';
+  root.append(node('small', 'eyebrow', p.name), heading);
   if (d.type === 'CHAIN_RESPONSE') {
-    modal.innerHTML += '<h3>チェーンしますか？</h3><p>発動可能な魔法を選択してください。</p>';
-    const list = document.createElement('div');
-    list.className = 'modal-card-list';
-    d.options.forEach(id => {
-      const card = p.hand.find(c => c.id === id);
-      if (!card) return;
-      const b = renderCard(card);
-      b.onclick = () => {
-        engine.respondChain(d.player, id);
-        render();
-      };
-      list.appendChild(b);
-    });
-    modal.appendChild(list);
-    modal.appendChild(actionButton('発動しない', () => {
-      engine.respondChain(d.player, null);
-      render();
-    }));
+    const b = engine.state.battle;
+    let atk = b.attackerBase + b.attackerBonus, def = b.defenderBase + b.defenderBonus;
+    for (const item of engine.state.chain) if (item.card.effect === 'boost') { if (item.player === b.attackerPlayer) atk += item.card.value; else def += item.card.value; }
+    root.append(node('p', '', b.direct ? `直接攻撃 · 攻撃力 ${atk}` : `攻撃 ${atk} ／ 防御側の攻撃力 ${def}`), node('p', 'muted', '魔法を選んで発動。選ばない場合は「発動しない」。'));
   }
-
-  if (d.type === 'MADOKA_REVIVE') {
-    modal.innerHTML += '<h3>プルウィア☆マギカ</h3><p>墓地から蘇生する使い魔・魔女を1体選択。</p>';
-    const list = document.createElement('div');
-    list.className = 'modal-card-list';
-    d.options.forEach(id => {
-      const card = p.graveyard.find(c => c.id === id);
-      if (!card) return;
-      const b = renderCard(card);
-      b.onclick = () => {
-        engine.selectReviveTarget(d.player, id);
-        clearSelections();
-        render();
-      };
-      list.appendChild(b);
-    });
-    modal.appendChild(list);
+  const list = node('div', 'modal-cards');
+  for (const id of d.options) {
+    const card = (d.type === 'CHAIN_RESPONSE' ? p.hand : p.graveyard).find(c => c.id === id);
+    const b = cardButton(card, d.player, 'choice');
+    b.onclick = () => perform(() => d.type === 'CHAIN_RESPONSE' ? engine.respondChain(d.player, id) : engine.selectReviveTarget(d.player, id));
+    list.append(b);
   }
+  root.append(list);
+  if (d.type === 'CHAIN_RESPONSE') root.append(button('発動しない', () => perform(() => engine.respondChain(d.player)), 'secondary'));
+  if (!dialog.open) dialog.showModal();
 }
-
-$('#new-game').onclick = start;
+function showGrave(index) {
+  if (engine.state.pendingDecision) return;
+  const root = $('#modal'), p = engine.player(index); root.replaceChildren();
+  const title = node('h2', '', `${p.name}の墓地`); title.id = 'decision-title'; root.append(title);
+  const list = node('div', 'modal-cards');
+  p.graveyard.forEach(card => list.append(cardButton(card, index, 'grave')));
+  root.append(list, button('閉じる', () => $('#decision').close(), 'secondary'));
+  $('#decision').showModal();
+}
+$('#decision').addEventListener('cancel', e => { if (engine.state.pendingDecision) e.preventDefault(); });
+$('#new-game').onclick = () => { if (engine.state.phase === PHASES.GAME_OVER) start(); else $('#restart').showModal(); };
+$('#cancel-restart').onclick = () => $('#restart').close();
+$('#confirm-restart').onclick = () => { $('#restart').close(); start(); };
+$('#policy-file').onchange = async event => {
+  const file = event.target.files[0]; if (!file) return;
+  try {
+    if (file.size > 40 * 1024 * 1024) throw new Error('AIファイルは40MB以下にしてください。');
+    const loaded = new Policy(JSON.parse(await file.text())); policy = loaded;
+    $('#ai-name').textContent = '強化学習AI'; notify('学習済みAIを読み込みました。'); scheduleAI();
+  } catch (error) { notify(`読み込めませんでした：${error.message}`); }
+  event.target.value = '';
+};
+document.addEventListener('keydown', event => { if (event.key === 'Escape' && !engine.state.pendingDecision) { clear(); render(); } });
 start();

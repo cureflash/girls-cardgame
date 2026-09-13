@@ -3,24 +3,44 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Magical Duel Prototype</title>
-  <link rel="stylesheet" href="./styles-v20260913.css?v=layout4">
+  <meta name="theme-color" content="#15151f">
+  <title>魔法少女の決闘 | Magical Duel</title>
+  <link rel="stylesheet" href="./styles.css?v=rules1">
 </head>
 <body>
-  <div class="hud"><div id="turn"></div><div id="status"></div><button id="new-game">NEW DUEL</button></div>
-  <main class="board">
-    <section id="top-player" class="player top">
-      <aside class="character-panel"><img class="character-image" alt=""><div class="character-name"></div><div class="passive"></div><div class="special-name"></div></aside>
-      <div class="player-name"></div><div class="hand"></div><div class="field"></div>
-    </section>
-    <section class="center"><div id="chain-stack"></div><div id="actions"></div></section>
-    <section id="bottom-player" class="player bottom">
-      <div class="field"></div><div class="hand"></div><div class="player-name"></div>
-      <aside class="character-panel"><img class="character-image" alt=""><div class="character-name"></div><div class="passive"></div><div class="special-name"></div></aside>
-    </section>
+  <header class="header">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">✦</span><div><small>MAGICAL DUEL</small><h1>魔法少女の決闘</h1></div></div>
+    <div class="turn-indicator"><b id="turn"></b><span id="turn-name"></span></div>
+    <button id="new-game" class="quiet">新しいデュエル</button>
+  </header>
+  <div class="settings">
+    <label>あなた <select id="character"><option value="madoka">鹿目まどか</option><option value="mami">巴マミ</option></select></label>
+    <label>対戦相手 <select id="mode"><option value="cpu">AI</option><option value="local">同じ画面で2人</option></select></label>
+    <label>手番 <select id="seat"><option value="first">先攻</option><option value="second">後攻</option></select></label>
+    <span id="ai-name">基本AI</span><label class="file-button">学習済みAIを読み込む<input id="policy-file" type="file" accept=".json,application/json"></label>
+    <span class="settings-note">設定は新しいデュエルから</span>
+  </div>
+  <div id="notice" role="status" class="notice" hidden></div>
+  <main class="layout">
+    <div class="arena">
+      <section id="top-player" class="player opponent" aria-label="相手の場"></section>
+      <section class="command-area" aria-label="デュエル操作">
+        <ol id="phases" class="phases"><li data-phase="MAIN">メイン</li><li data-phase="BATTLE_START">必殺技の選択</li><li data-phase="BATTLE">バトル</li></ol>
+        <p id="hint" role="status"></p>
+        <div id="actions" class="actions"></div>
+        <div id="chain-stack"></div>
+      </section>
+      <section id="bottom-player" class="player own" aria-label="自分の場"></section>
+    </div>
+    <aside class="sidebar">
+      <section class="inspection"><h2>カード詳細</h2><div id="card-detail"><p class="muted">カードに触れると、ここに詳細を表示します。</p><div class="detail-placeholder" aria-hidden="true">✦</div></div></section>
+      <details class="history" open><summary>デュエルログ</summary><ol id="log"></ol></details>
+      <details class="rules"><summary>遊び方</summary><p>山札がライフ。0枚になると敗北します。</p><p>手札を選んで1ターンに1体召喚。魔女は攻撃力の合計が必要値以上になるよう、場の使い魔・魔女を生贄にします。</p><p>バトルでは自分のカード → 相手のカード →「攻撃する」。相手の場が空なら直接攻撃できます。各1回、先攻の初ターンは攻撃できません。</p><p>同値なら両方破壊。必殺技はデュエル中1回だけで、使用するとターンが終わります。</p></details>
+    </aside>
   </main>
-  <aside id="log" class="log"></aside>
-  <div id="modal-backdrop" class="modal-backdrop hidden"><div id="modal" class="modal"></div></div>
-  <script type="module" src="./src/v20260913/app.js?v=individual2"></script>
+  <div id="effect-layer" aria-hidden="true"></div>
+  <dialog id="decision" aria-labelledby="decision-title"><div id="modal"></div></dialog>
+  <dialog id="restart"><h2>新しいデュエルを始めますか？</h2><p>現在の対戦は終了します。</p><div class="actions"><button id="cancel-restart" class="quiet">続ける</button><button id="confirm-restart" class="primary">新しく始める</button></div></dialog>
+  <script type="module" src="./src/app.js?v=rules1"></script>
 </body>
 </html>

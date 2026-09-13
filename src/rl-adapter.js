@@ -9,7 +9,9 @@ export const RL_LIMITS = Object.freeze({
 });
 
 const SUMMON_COUNT = RL_LIMITS.MAX_HAND * RL_LIMITS.TRIBUTE_MASKS;
-const ATTACK_COUNT = RL_LIMITS.FIELD_SLOTS * RL_LIMITS.FIELD_SLOTS;
+export const ATTACK_TARGETS = RL_LIMITS.FIELD_SLOTS + 1; // target 5 means direct attack
+const ATTACK_COUNT = RL_LIMITS.FIELD_SLOTS * ATTACK_TARGETS;
+export const RULES_VERSION = '2026-09-13-confirmed-v1';
 
 export const ACTIONS = Object.freeze({
   PASS: 0,
@@ -27,7 +29,7 @@ export const ACTIONS = Object.freeze({
 
 const CARD_FEATURES = 11;
 const CHAIN_FEATURES = 5;
-const GLOBAL_FEATURES = 26;
+const GLOBAL_FEATURES = 44;
 export const OBSERVATION_SIZE = GLOBAL_FEATURES
   + RL_LIMITS.MAX_HAND * CARD_FEATURES
   + RL_LIMITS.FIELD_SLOTS * CARD_FEATURES * 2
@@ -51,8 +53,8 @@ export function encodeSummon(handIndex, tributeMask = 0) {
   return ACTIONS.SUMMON_BASE + handIndex * RL_LIMITS.TRIBUTE_MASKS + tributeMask;
 }
 
-export function encodeAttack(attackerSlot, targetSlot) {
-  return ACTIONS.ATTACK_BASE + attackerSlot * RL_LIMITS.FIELD_SLOTS + targetSlot;
+export function encodeAttack(attackerSlot, targetSlot = null) {
+  return ACTIONS.ATTACK_BASE + attackerSlot * ATTACK_TARGETS + (targetSlot ?? RL_LIMITS.FIELD_SLOTS);
 }
 
 export function encodeMainMagic(handIndex) { return ACTIONS.MAIN_MAGIC_BASE + handIndex; }
@@ -94,7 +96,7 @@ function chainFeatures(item, playerIndex) {
 export class RLAdapter {
   constructor(engine) {
     this.engine = engine;
-    this.logCursor = engine.state.logs.length;
+    this.eventCursor = engine.state.events.length;
     this.stats = this._newStats();
   }
 
@@ -154,6 +156,13 @@ export class RLAdapter {
       norm((battle?.attackerBase ?? 0) + (battle?.attackerBonus ?? 0), 40),
       norm((battle?.defenderBase ?? 0) + (battle?.defenderBonus ?? 0), 40),
       norm(s.chain.length, 30),
+      Number(self.specialUsed), Number(opp.specialUsed),
+      Number(self.summonedThisTurn), Number(opp.summonedThisTurn),
+      ...self.field.map(c => c?.attackedTurn === s.turn ? 1 : 0),
+      ...opp.field.map(c => c?.attackedTurn === s.turn ? 1 : 0),
+      battle?.direct ? 1 : 0, norm(s.chainPassCount, 2),
+      norm(battle ? battle.attackerSlot + 1 : 0, 6),
+      norm(battle && !battle.direct ? battle.defenderSlot + 1 : 0, 6),
     ];
 
     appendCards(out, self.hand, RL_LIMITS.MAX_HAND);
@@ -194,7 +203,7 @@ export class RLAdapter {
 
     if (s.priorityPlayer !== playerIndex) return [];
     const p = this.engine.player(playerIndex);
-    const actions = [ACTIONS.PASS];
+    const actions = s.activePlayer === playerIndex ? [] : [ACTIONS.PASS];
 
     if (this.engine.canEndTurn(playerIndex)) actions.push(ACTIONS.END_TURN);
     if (this.engine.canEnterBattlePhase(playerIndex)) actions.push(ACTIONS.ENTER_BATTLE);
@@ -217,6 +226,7 @@ export class RLAdapter {
     const opp = this.engine.player(this.engine.opponent(playerIndex));
     for (let a = 0; a < RL_LIMITS.FIELD_SLOTS; a++) {
       if (!p.field[a]) continue;
+      if (this.engine.canAttack(playerIndex, a, null)) actions.push(encodeAttack(a, null));
       for (let t = 0; t < RL_LIMITS.FIELD_SLOTS; t++) {
         if (opp.field[t] && this.engine.canAttack(playerIndex, a, t)) {
           actions.push(encodeAttack(a, t));
@@ -285,10 +295,10 @@ export class RLAdapter {
       this.engine.summon(playerIndex, card.id, tributeMaskToSlots(tributeMask));
     } else if (action >= ACTIONS.ATTACK_BASE && action < ACTIONS.MAIN_MAGIC_BASE) {
       const offset = action - ACTIONS.ATTACK_BASE;
-      const attacker = Math.floor(offset / RL_LIMITS.FIELD_SLOTS);
-      const target = offset % RL_LIMITS.FIELD_SLOTS;
+      const attacker = Math.floor(offset / ATTACK_TARGETS);
+      const target = offset % ATTACK_TARGETS;
       this.stats.attacks[playerIndex] += 1;
-      this.engine.attack(playerIndex, attacker, target);
+      this.engine.attack(playerIndex, attacker, target === RL_LIMITS.FIELD_SLOTS ? null : target);
     } else if (action >= ACTIONS.MAIN_MAGIC_BASE && action < ACTIONS.CHAIN_BASE) {
       const handIndex = action - ACTIONS.MAIN_MAGIC_BASE;
       const card = this.engine.player(playerIndex).hand[handIndex];
@@ -303,20 +313,17 @@ export class RLAdapter {
 
   _afterAction() {
     this.stats.maxChain = Math.max(this.stats.maxChain, this.engine.state.chain.length);
-    const logs = this.engine.state.logs;
-    for (; this.logCursor < logs.length; this.logCursor++) {
-      const line = logs[this.logCursor];
-      for (let i = 0; i < 2; i++) {
-        const name = this.engine.player(i).name;
-        if (!line.startsWith(`${name}が戦闘に敗北（ダメージ `)) continue;
-        const m = line.match(/ダメージ (\d+)/);
-        const damage = m ? Number(m[1]) : 0;
-        this.stats.damageTaken[i] += damage;
-        if (this.engine.state.turn <= 5) this.stats.earlyDamageTaken[i] += damage;
-        if (damage > 0) {
-          this.stats.damageEvents[i] += 1;
-          if (damage % 3 === 1) this.stats.threeNPlusOneEvents[i] += 1;
-        }
+    const events = this.engine.state.events;
+    for (; this.eventCursor < events.length; this.eventCursor++) {
+      const event = events[this.eventCursor];
+      if (event.type !== 'damage') continue;
+      const i = event.player;
+      const damage = event.amount;
+      this.stats.damageTaken[i] += damage;
+      if (event.turn <= 5) this.stats.earlyDamageTaken[i] += damage;
+      if (damage > 0) {
+        this.stats.damageEvents[i] += 1;
+        if (damage % 3 === 1) this.stats.threeNPlusOneEvents[i] += 1;
       }
     }
   }
@@ -336,6 +343,7 @@ export class RLAdapter {
 
 export function rlSpec() {
   return {
+    rulesVersion: RULES_VERSION,
     actionCount: ACTIONS.COUNT,
     observationSize: OBSERVATION_SIZE,
     limits: RL_LIMITS,

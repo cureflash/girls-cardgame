@@ -26,6 +26,7 @@ export class GameEngine {
       resumePhase: null,
       battle: null,
       logs: [],
+      events: [],
       winner: null,
       players: players.map((p, i) => ({
         id: p.id,
@@ -35,6 +36,8 @@ export class GameEngine {
         hand: [],
         field: Array(5).fill(null),
         graveyard: [],
+        summonedThisTurn: false,
+        specialUsed: false,
       })),
     };
 
@@ -63,16 +66,37 @@ export class GameEngine {
   opponent(index) { return 1 - index; }
   log(message) { this.state.logs.push(message); }
 
-  draw(playerIndex, count = 1, { log = true } = {}) {
+  // Presentation consumes these records; effects never decide or delay the rules.
+  emit(type, detail = {}) {
+    this.state.events.push({ id: this.state.events.length, turn: this.state.turn, type, ...detail });
+  }
+
+  setPhase(phase) {
+    const from = this.state.phase;
+    this.state.phase = phase;
+    if (from !== phase) this.emit('phase', { from, to: phase, player: this.state.activePlayer });
+  }
+
+  destroy(playerIndex, slot, reason) {
     const p = this.player(playerIndex);
-    for (let i = 0; i < count; i++) {
-      if (p.deck.length === 0) {
-        this.endGame(this.opponent(playerIndex), `${p.name}のデッキが尽きた`);
-        return;
-      }
+    const card = p.field[slot];
+    if (!card) return;
+    p.graveyard.push(card);
+    p.field[slot] = null;
+    this.emit('destroy', { player: playerIndex, slot, card: { ...card }, reason });
+  }
+
+  draw(playerIndex, count = 1, { log = true } = {}) {
+    if (this.state.phase === PHASES.GAME_OVER) return;
+    const p = this.player(playerIndex);
+    let drawn = 0;
+    while (drawn < count && p.deck.length) {
       p.hand.push(p.deck.shift());
+      drawn++;
     }
-    if (log) this.log(`${p.name}が${count}枚ドロー`);
+    if (log) this.log(`${p.name}が${drawn}枚ドロー`);
+    if (drawn) this.emit('draw', { player: playerIndex, count: drawn });
+    if (p.deck.length === 0) this.endGame(this.opponent(playerIndex), `${p.name}のデッキが尽きた`);
   }
 
   ensurePriority(playerIndex) {
@@ -87,15 +111,15 @@ export class GameEngine {
     const p = this.player(playerIndex);
     const card = p.hand.find(c => c.id === cardId);
     if (!card || ![CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(card.type)) return false;
-    if (!p.field.includes(null)) return false;
-    if (card.type === CARD_TYPES.FAMILIAR) return true;
+    if (p.summonedThisTurn) return false;
+    if (card.type === CARD_TYPES.FAMILIAR) return p.field.includes(null);
     return this.validTributeSets(playerIndex, card).length > 0;
   }
 
   validTributeSets(playerIndex, witchCard) {
     const fieldCards = this.player(playerIndex).field
       .map((card, slot) => ({ card, slot }))
-      .filter(x => x.card?.type === CARD_TYPES.FAMILIAR);
+      .filter(x => x.card && [CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(x.card.type));
     const threshold = witchCard.tributeThreshold ?? 0;
     const results = [];
     const n = fieldCards.length;
@@ -119,25 +143,27 @@ export class GameEngine {
     const p = this.player(playerIndex);
     const handIndex = p.hand.findIndex(c => c.id === cardId);
     const card = p.hand[handIndex];
-    const emptySlot = p.field.indexOf(null);
-    if (emptySlot < 0) throw new Error('Monster zones are full.');
 
     if (card.type === CARD_TYPES.WITCH) {
       const unique = [...new Set(tributeSlots)];
       const tributes = unique.map(slot => p.field[slot]);
-      if (tributes.some(c => !c || c.type !== CARD_TYPES.FAMILIAR)) throw new Error('Witches require familiar tributes.');
+      if (!unique.length || unique.some(slot => !Number.isInteger(slot) || slot < 0 || slot >= 5)
+        || tributes.some(c => !c || ![CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(c.type))) throw new Error('生贄には場の使い魔・魔女を選んでください。');
       const total = tributes.reduce((sum, c) => sum + (c.attack ?? 0), 0);
       if (total < (card.tributeThreshold ?? 0)) throw new Error('Tribute attack is below threshold.');
       unique.forEach(slot => {
         p.graveyard.push(p.field[slot]);
         p.field[slot] = null;
       });
-      this.log(`${p.name}は使い魔を生贄にした（合計攻撃値 ${total}）`);
+      this.log(`${p.name}は使い魔・魔女を生贄にした（合計攻撃値 ${total}）`);
     }
 
     p.hand.splice(handIndex, 1);
     const destination = p.field.indexOf(null);
     p.field[destination] = card;
+    card.attackedTurn = null;
+    p.summonedThisTurn = true;
+    this.emit('summon', { player: playerIndex, slot: destination, card: { ...card }, tributes: [...tributeSlots] });
     this.log(`${p.name}が${card.name}を召喚`);
     this.passPriorityTo(this.opponent(playerIndex));
     return destination;
@@ -172,7 +198,7 @@ export class GameEngine {
   enterBattlePhase(playerIndex) {
     this.ensurePriority(playerIndex);
     if (!this.canEnterBattlePhase(playerIndex)) throw new Error('Battle phase cannot be entered now.');
-    this.state.phase = PHASES.BATTLE_START;
+    this.setPhase(PHASES.BATTLE_START);
     this.state.priorityPlayer = playerIndex;
     this.log(`${this.player(playerIndex).name}がバトルフェイズ開始時へ`);
     this.openPriorityWindow();
@@ -188,40 +214,41 @@ export class GameEngine {
   continueBattlePhase(playerIndex) {
     this.ensurePriority(playerIndex);
     if (!this.canContinueBattlePhase(playerIndex)) throw new Error('Battle phase cannot continue now.');
-    this.state.phase = PHASES.BATTLE;
+    this.setPhase(PHASES.BATTLE);
     this.state.priorityPlayer = playerIndex;
     this.log(`${this.player(playerIndex).name}のバトルフェイズ`);
     this.openPriorityWindow();
   }
 
-  canAttack(playerIndex, attackerSlot, targetSlot) {
+  canAttack(playerIndex, attackerSlot, targetSlot = null) {
     if (this.state.phase !== PHASES.BATTLE || this.state.pendingDecision) return false;
     if (this.state.activePlayer !== playerIndex || this.state.priorityPlayer !== playerIndex) return false;
-    if (this.state.turn === 1 && playerIndex === 0) return false;
+    if (this.state.turn === 1) return false;
+    if (!Number.isInteger(attackerSlot) || attackerSlot < 0 || attackerSlot >= 5) return false;
     const attacker = this.player(playerIndex).field[attackerSlot];
-    const defender = this.player(this.opponent(playerIndex)).field[targetSlot];
-    return !!attacker && !!defender;
+    if (!attacker || attacker.attackedTurn === this.state.turn) return false;
+    const field = this.player(this.opponent(playerIndex)).field;
+    if (targetSlot === null) return field.every(c => !c);
+    return Number.isInteger(targetSlot) && targetSlot >= 0 && targetSlot < 5 && !!field[targetSlot];
   }
 
-  attack(playerIndex, attackerSlot, targetSlot) {
+  attack(playerIndex, attackerSlot, targetSlot = null) {
     this.ensurePriority(playerIndex);
-    if (!this.canAttack(playerIndex, attackerSlot, targetSlot)) throw new Error('Attack is not legal in the current state.');
+    if (!this.canAttack(playerIndex, attackerSlot, targetSlot)) throw new Error('今はその攻撃を行えません。');
     const attacker = this.player(playerIndex).field[attackerSlot];
-    const defender = this.player(this.opponent(playerIndex)).field[targetSlot];
-
+    const defender = targetSlot === null ? null : this.player(this.opponent(playerIndex)).field[targetSlot];
+    attacker.attackedTurn = this.state.turn;
     this.state.battle = {
-      attackerPlayer: playerIndex,
-      attackerSlot,
-      defenderPlayer: this.opponent(playerIndex),
-      defenderSlot: targetSlot,
-      attackerBase: attacker.attack ?? 0,
-      defenderBase: defender.attack ?? 0,
-      attackerBonus: 0,
-      defenderBonus: 0,
-      damageNullifiedFor: null,
+      attackerPlayer: playerIndex, attackerSlot,
+      defenderPlayer: this.opponent(playerIndex), defenderSlot: targetSlot,
+      direct: targetSlot === null,
+      attackerBase: attacker.attack ?? 0, defenderBase: defender?.attack ?? 0,
+      attackerBonus: 0, defenderBonus: 0,
+      damagePrevented: [false, false],
     };
     this.state.resumePhase = PHASES.BATTLE;
-    this.log(`${attacker.name}が${defender.name}を攻撃`);
+    this.log(`${attacker.name}が${defender ? defender.name + 'を攻撃' : '直接攻撃'}`);
+    this.emit('attack', { ...structuredClone(this.state.battle) });
     this.state.chainPassCount = 0;
     this.beginChainWindow(playerIndex);
   }
@@ -233,14 +260,15 @@ export class GameEngine {
   }
 
   canActivateMagic(playerIndex, card) {
-    if (card.effect === 'boost') return !!this.state.battle;
+    if (card.effect === 'boost') return !!this.state.battle
+      && (!this.state.battle.direct || playerIndex === this.state.battle.attackerPlayer);
     if (card.effect === 'nullifyDamage') return !!this.state.battle;
     return false;
   }
 
   beginChainWindow(playerIndex) {
     const options = this.activatableChainCards(playerIndex);
-    this.state.phase = PHASES.CHAIN;
+    this.setPhase(PHASES.CHAIN);
     this.state.priorityPlayer = playerIndex;
 
     if (options.length === 0) {
@@ -264,6 +292,8 @@ export class GameEngine {
   respondChain(playerIndex, cardId = null) {
     const d = this.state.pendingDecision;
     if (!d || d.type !== 'CHAIN_RESPONSE' || d.player !== playerIndex) throw new Error('No chain response is pending for this player.');
+    if (cardId && (!d.options.includes(cardId) || !this.player(playerIndex).hand.some(c => c.id === cardId)))
+      throw new Error('Card is not an available chain option.');
     this.state.pendingDecision = null;
 
     if (!cardId) {
@@ -289,7 +319,7 @@ export class GameEngine {
       const item = this.state.chain.pop();
       this.resolveMagic(item.player, item.card);
     }
-    this.state.phase = this.state.resumePhase ?? PHASES.BATTLE;
+    this.setPhase(this.state.resumePhase ?? PHASES.BATTLE);
     if (this.state.battle) this.resolveBattle();
   }
 
@@ -300,9 +330,10 @@ export class GameEngine {
       if (playerIndex === battle.attackerPlayer) battle.attackerBonus += card.value ?? 0;
       else if (playerIndex === battle.defenderPlayer) battle.defenderBonus += card.value ?? 0;
     } else if (card.effect === 'nullifyDamage') {
-      battle.damageNullifiedFor = playerIndex;
+      battle.damagePrevented[playerIndex] = true;
     }
     this.player(playerIndex).graveyard.push(card);
+    this.emit('magic', { player: playerIndex, card: { ...card } });
   }
 
   resolveBattle() {
@@ -310,27 +341,27 @@ export class GameEngine {
     const attackValue = b.attackerBase + b.attackerBonus;
     const defendValue = b.defenderBase + b.defenderBonus;
 
-    if (attackValue === defendValue) {
-      this.log(`戦闘は引き分け（${attackValue} - ${defendValue}）`);
+    if (!b.direct && attackValue === defendValue) {
+      this.destroy(b.attackerPlayer, b.attackerSlot, 'battle');
+      this.destroy(b.defenderPlayer, b.defenderSlot, 'battle');
+      this.log(`同値のため両方を破壊（${attackValue} - ${defendValue}）`);
     } else {
-      const loserPlayer = attackValue > defendValue ? b.defenderPlayer : b.attackerPlayer;
+      const loserPlayer = b.direct || attackValue > defendValue ? b.defenderPlayer : b.attackerPlayer;
       const loserSlot = attackValue > defendValue ? b.defenderSlot : b.attackerSlot;
-      const rawDamage = Math.max(attackValue, defendValue) - Math.min(attackValue, defendValue);
-      const loserCard = this.player(loserPlayer).field[loserSlot];
-      if (loserCard) {
-        this.player(loserPlayer).graveyard.push(loserCard);
-        this.player(loserPlayer).field[loserSlot] = null;
-      }
-      const damage = b.damageNullifiedFor === loserPlayer ? 0 : this.applyCharacterDamageReduction(loserPlayer, rawDamage);
-      this.log(`${this.player(loserPlayer).name}が戦闘に敗北（ダメージ ${damage}）`);
+      const rawDamage = b.direct ? attackValue : Math.abs(attackValue - defendValue);
+      if (!b.direct) this.destroy(loserPlayer, loserSlot, 'battle');
+      const damage = b.damagePrevented[loserPlayer] ? 0 : this.applyCharacterDamageReduction(loserPlayer, rawDamage);
+      this.log(`${this.player(loserPlayer).name}に${b.direct ? '直接攻撃' : '戦闘'}ダメージ ${damage}`);
+      this.emit('damage', { player: loserPlayer, amount: damage, rawAmount: rawDamage, direct: b.direct });
       if (damage > 0) this.takeDeckDamage(loserPlayer, damage);
     }
-
+    this.emit('battleEnd', { ...structuredClone(b), attackValue, defendValue });
     this.state.battle = null;
     this.state.chainPassCount = 0;
     this.state.resumePhase = null;
     if (this.state.phase !== PHASES.GAME_OVER) {
-      this.state.phase = PHASES.BATTLE;
+      this.setPhase(PHASES.BATTLE);
+      this.state.priorityPlayer = this.state.activePlayer;
       this.openPriorityWindow();
     }
   }
@@ -341,20 +372,14 @@ export class GameEngine {
 
   takeDeckDamage(playerIndex, damage) {
     const p = this.player(playerIndex);
-    const revealed = [];
-    for (let i = 0; i < damage; i++) {
-      if (p.deck.length === 0) {
-        this.endGame(this.opponent(playerIndex), `${p.name}のデッキが尽きた`);
-        return;
-      }
-      revealed.push(p.deck.shift());
-    }
+    // Move all available cards before ending the duel, even when damage exceeds life.
+    const revealed = p.deck.splice(0, Math.max(0, damage));
     const toHandCount = Math.ceil(damage / 3);
     const toHand = revealed.slice(0, toHandCount);
     const toGrave = revealed.slice(toHandCount);
     p.hand.push(...toHand);
     p.graveyard.push(...toGrave);
-    this.log(`${p.name}: ${damage}枚めくり、${toHand.length}枚を手札、${toGrave.length}枚を墓地へ`);
+    this.log(`${p.name}: ${revealed.length}枚めくり、${toHand.length}枚を手札、${toGrave.length}枚を墓地へ`);
     if (p.deck.length === 0) this.endGame(this.opponent(playerIndex), `${p.name}のデッキが尽きた`);
   }
 
@@ -362,6 +387,7 @@ export class GameEngine {
     if (this.state.phase !== PHASES.BATTLE_START || this.state.pendingDecision) return false;
     if (this.state.activePlayer !== playerIndex || this.state.priorityPlayer !== playerIndex) return false;
     const p = this.player(playerIndex);
+    if (p.specialUsed) return false;
     if (p.character?.id === 'madoka') {
       return p.field.includes(null) && p.graveyard.some(c => [CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(c.type));
     }
@@ -373,6 +399,8 @@ export class GameEngine {
     this.ensurePriority(playerIndex);
     if (!this.canUseSpecial(playerIndex)) throw new Error('Special move cannot be activated.');
     const p = this.player(playerIndex);
+    p.specialUsed = true;
+    this.emit('special', { player: playerIndex, character: p.character.id });
     if (p.character.id === 'mami') {
       this.resolveTiroFinale(playerIndex);
       this._finishTurnAfterSpecial(playerIndex);
@@ -388,15 +416,11 @@ export class GameEngine {
   }
 
   resolveTiroFinale(playerIndex) {
-    this.state.players.forEach(p => {
-      p.field.forEach((card, slot) => {
-        if (card && [CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(card.type)) {
-          p.graveyard.push(card);
-          p.field[slot] = null;
-        }
-      });
+    const opponent = this.opponent(playerIndex);
+    this.player(opponent).field.forEach((card, slot) => {
+      if (card && [CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(card.type)) this.destroy(opponent, slot, 'special');
     });
-    this.log(`${this.player(playerIndex).name}「ティロ・フィナーレ」— 全モンスター破壊`);
+    this.log(`${this.player(playerIndex).name}「ティロ・フィナーレ」— 相手の使い魔・魔女を全て破壊`);
   }
 
   selectReviveTarget(playerIndex, cardId) {
@@ -408,6 +432,8 @@ export class GameEngine {
     if (idx < 0 || slot < 0) throw new Error('Revive is no longer possible.');
     const [card] = p.graveyard.splice(idx, 1);
     p.field[slot] = card;
+    card.attackedTurn = null;
+    this.emit('revive', { player: playerIndex, slot, card: { ...card } });
     this.state.pendingDecision = null;
     this.log(`${p.name}「プルウィア☆マギカ」— ${card.name}を蘇生`);
     this._finishTurnAfterSpecial(playerIndex);
@@ -441,7 +467,8 @@ export class GameEngine {
     this.state.turn += 1;
     this.state.activePlayer = this.opponent(playerIndex);
     this.state.priorityPlayer = this.state.activePlayer;
-    this.state.phase = PHASES.MAIN;
+    this.setPhase(PHASES.MAIN);
+    this.player(this.state.activePlayer).summonedThisTurn = false;
     this.draw(this.state.activePlayer, 1);
     if (this.state.phase !== PHASES.GAME_OVER) {
       this.log(`ターン${this.state.turn}: ${this.player(this.state.activePlayer).name}`);
@@ -461,8 +488,10 @@ export class GameEngine {
   }
 
   endGame(winnerIndex, reason) {
-    this.state.phase = PHASES.GAME_OVER;
+    if (this.state.phase === PHASES.GAME_OVER) return;
+    this.setPhase(PHASES.GAME_OVER);
     this.state.winner = winnerIndex;
+    this.emit('gameOver', { winner: winnerIndex, reason });
     this.state.pendingDecision = null;
     this.state.resumePhase = null;
     this.log(`${this.player(winnerIndex).name}の勝利: ${reason}`);
