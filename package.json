@@ -8,6 +8,7 @@
     "ga:evolve": "node ga/evolve.mjs",
     "ga:evaluate": "node ga/evaluate.mjs",
     "ga:publish": "node ga/publish.mjs",
-    "cfr:solve": "node cfr/run.mjs"
+    "cfr:solve": "node cfr/run.mjs",
+    "br:solve": "node br/run.mjs"
   }
 }
