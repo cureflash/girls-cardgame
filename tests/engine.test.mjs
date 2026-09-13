@@ -208,9 +208,9 @@ test('witches can tribute witches from a full field and invalid tributes leave s
   assert.deepEqual(p.graveyard.map(c=>c.id),['old8','five']);
 });
 
-test('shield protects its familiar in an equal battle and ends the chain immediately', () => {
+test('shield protects its familiar, ends the chain, and ends the battle phase', () => {
   const e=engine();
-  e.player(0).field[0]=familiar('a',5); e.player(1).field[0]=familiar('b',5);
+  e.player(0).field[0]=familiar('a',5); e.player(1).field[0]=familiar('b',5); e.player(1).field[1]=familiar('next',4);
   e.player(0).hand=[]; e.player(1).hand=[nullify('shield')];
   battle(e);
   const before=e.player(0).deck.length;
@@ -218,15 +218,19 @@ test('shield protects its familiar in an equal battle and ends the chain immedia
   e.respondChain(1,'shield');
   assert.equal(e.state.pendingDecision,null);
   assert.equal(e.state.phase,PHASES.BATTLE);
+  assert.equal(e.state.battlePhaseEnded,true);
   assert.equal(e.player(0).field[0],null);
   assert.equal(e.player(1).field[0].id,'b');
   assert.equal(e.player(0).deck.length,before);
   assert.equal(e.player(1).graveyard.some(c=>c.id==='shield'),true);
+  assert.equal(e.canAttack(1,1,null),false);
+  assert.equal(e.canEndTurn(1),true);
 });
 
-test('shield ends the chain, keeps earlier boosts spent, protects the familiar, and does not cancel damage', () => {
+test('shield ends the chain, keeps earlier boosts spent, prevents battle damage, and ends the battle phase', () => {
   const e=engine();
   e.player(1).field[0]=familiar('attacker',5);
+  e.player(1).field[1]=familiar('next',4);
   e.player(0).field[0]=familiar('defender',8);
   e.player(1).hand=[boost('up',5)];
   e.player(0).hand=[nullify('shield')];
@@ -239,9 +243,12 @@ test('shield ends the chain, keeps earlier boosts spent, protects the familiar, 
   assert.equal(e.state.pendingDecision,null);
   assert.equal(e.state.chain.length,0);
   assert.equal(e.player(0).field[0].id,'defender');
-  assert.equal(before-e.player(0).deck.length,1);
+  assert.equal(before-e.player(0).deck.length,0);
   assert.equal(e.player(1).graveyard.some(c=>c.id==='up'),true);
   assert.equal(e.player(0).graveyard.some(c=>c.id==='shield'),true);
+  assert.equal(e.state.battlePhaseEnded,true);
+  assert.equal(e.canAttack(1,1,0),false);
+  assert.equal(e.canEndTurn(1),true);
 });
 
 test('direct attack requires an empty opponent field, applies Madoka reduction and exhausts attacker', () => {
