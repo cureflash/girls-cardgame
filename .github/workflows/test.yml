@@ -86,3 +86,13 @@ jobs:
             /tmp/current-meta-ga/latest-mami.json
             /tmp/current-meta-evaluation.json
           retention-days: 7
+      - name: Confirm best response versus current-meta champions
+        if: contains(github.event.head_commit.message, '[confirm-current-meta-best-response]')
+        run: node br/confirm-current-meta.mjs --pair ga/current-meta-analysis-pair.json --character madoka --games 100 --samples 16 --min-gain 0.05 --max-actions 300 --output /tmp/current-meta-best-response.json
+      - name: Upload current-meta best response
+        if: contains(github.event.head_commit.message, '[confirm-current-meta-best-response]')
+        uses: actions/upload-artifact@v4
+        with:
+          name: current-meta-best-response
+          path: /tmp/current-meta-best-response.json
+          retention-days: 7
