@@ -1,4 +1,4 @@
-import { GameEngine, CARD_TYPES, PHASES } from './game-engine.js';
+import { GameEngine, CARD_TYPES, PHASES } from './game-engine.js?v=shield1';
 import { CHARACTERS, createDeck } from './card-data.js';
 import { RLAdapter } from './rl-adapter.js';
 import { chooseBaselineAction } from './baseline-ai.js';
