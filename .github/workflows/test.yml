@@ -14,8 +14,13 @@ jobs:
         with:
           node-version: '22'
       - name: Core regression tests
-        run: node --test tests/engine.test.mjs tests/hand-tributes.test.mjs tests/rl-adapter.test.mjs tests/evaluation-ai.test.mjs tests/genetics.test.mjs
+        run: node --test tests/engine.test.mjs tests/hand-tributes.test.mjs tests/rl-adapter.test.mjs tests/evaluation-ai.test.mjs tests/genetics.test.mjs tests/character-ai.test.mjs
       - name: 300-duel regression
         run: node --test --test-name-pattern='300 seeded random and tactical duels finish legally without card loss or deadlock' tests/integration.test.mjs
-      - name: Genetic trainer smoke
-        run: npm run ga:evolve -- --population 4 --generations 1 --opponents 1 --max-actions 200 --output /tmp/ga-smoke
+      - name: Split genetic trainer smoke
+        run: |
+          npm run ga:evolve -- --population 4 --generations 1 --opponents 1 --max-actions 200 --output /tmp/ga-smoke
+          test -f /tmp/ga-smoke/latest-madoka.json
+          test -f /tmp/ga-smoke/latest-mami.json
+          test -f /tmp/ga-smoke/latest.json
+          npm run ga:evaluate -- /tmp/ga-smoke/latest.json --games 8 --seed 99
