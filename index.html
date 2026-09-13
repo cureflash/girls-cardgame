@@ -35,12 +35,12 @@
     <aside class="sidebar">
       <section class="inspection"><h2>カード詳細</h2><div id="card-detail"><p class="muted">カードに触れると、ここに詳細を表示します。</p><div class="detail-placeholder" aria-hidden="true">✦</div></div></section>
       <details class="history" open><summary>デュエルログ</summary><ol id="log"></ol></details>
-      <details class="rules"><summary>遊び方</summary><p>山札がライフ。0枚になると敗北します。</p><p>手札を選んで1ターンに1体召喚。魔女は、場の使い魔・魔女と手札の使い魔を生贄にでき、攻撃力合計が必要値以上なら召喚できます。手札の魔女は生贄にできません。</p><p>バトルでは自分のカード → 相手のカード →「攻撃する」。相手の場が空なら直接攻撃できます。各1回、先攻の初ターンは攻撃できません。</p><p>同値なら通常は両方破壊。盾を使うと、その使い魔は戦闘で破壊されず、発動した時点でチェーンが終了します。それまでに使った攻撃力アップ魔法は墓地へ送られます。戦闘ダメージは通常通りです。</p><p>必殺技はデュエル中1回だけで、使用するとターンが終わります。</p></details>
+      <details class="rules"><summary>遊び方</summary><p>山札がライフ。0枚になると敗北します。</p><p>手札を選んで1ターンに1体召喚。魔女は、場の使い魔・魔女と手札の使い魔を生贄にでき、攻撃力合計が必要値以上なら召喚できます。手札の魔女は生贄にできません。</p><p>バトルでは自分のカード → 相手のカード →「攻撃する」。相手の場が空なら直接攻撃できます。各1回、先攻の初ターンは攻撃できません。</p><p>同値なら通常は両方破壊。盾を使うと、その使い魔は戦闘で破壊されず、自分が受ける戦闘ダメージは0になります。発動した時点でチェーンが終了し、この戦闘の解決後にバトルフェイズも終了します。それまでに使った攻撃力アップ魔法は墓地へ送られます。</p><p>必殺技はデュエル中1回だけで、使用するとターンが終わります。</p></details>
     </aside>
   </main>
   <div id="effect-layer" aria-hidden="true"></div>
   <dialog id="decision" aria-labelledby="decision-title"><div id="modal"></div></dialog>
   <dialog id="restart"><h2>新しいデュエルを始めますか？</h2><p>現在の対戦は終了します。</p><div class="actions"><button id="cancel-restart" class="quiet">続ける</button><button id="confirm-restart" class="primary">新しく始める</button></div></dialog>
-  <script type="module" src="./src/app.js?v=splitai1"></script>
+  <script type="module" src="./src/app.js?v=shield2"></script>
 </body>
 </html>
