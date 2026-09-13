@@ -1,5 +1,5 @@
 import { GameEngine, CARD_TYPES, PHASES } from './game-engine.js';
-import { CHARACTERS, createPrototypeDeck } from './card-data.js';
+import { CHARACTERS, createMadokaDeck, createMamiDeck } from './card-data.js';
 
 const $ = (sel) => document.querySelector(sel);
 let engine;
@@ -13,26 +13,49 @@ function start() {
       { id: 'p1', name: 'P1 まどか', character: CHARACTERS.madoka },
       { id: 'p2', name: 'P2 マミ', character: CHARACTERS.mami },
     ],
-    decks: [createPrototypeDeck(), createPrototypeDeck()],
+    decks: [createMadokaDeck(), createMamiDeck()],
   });
   render();
 }
 
 function label(card) {
   if (!card) return '';
-  if (card.type === CARD_TYPES.FAMILIAR) return `${card.suit}${card.rank}\n使い魔\nATK ${card.attack}`;
-  if (card.type === CARD_TYPES.WITCH) return `${card.suit}${card.rank}\n魔女\nATK ${card.attack}\n生贄合計≥${card.tributeThreshold}`;
-  return `${card.suit}${card.rank === 1 ? 'A' : card.rank}\n魔法\n${card.effect === 'boost' ? `+${card.value}` : 'ダメージ0'}`;
+  if (card.type === CARD_TYPES.FAMILIAR) return `${card.name}\nATK ${card.attack}`;
+  if (card.type === CARD_TYPES.WITCH) return `${card.name}\nATK ${card.attack}\n生贄合計≥${card.tributeThreshold}`;
+  if (card.effect === 'boost') return `${card.name}\n攻撃力+${card.value}`;
+  if (card.effect === 'nullifyDamage') return `${card.name}\nダメージ0`;
+  if (card.effect === 'draw') return `${card.name}\n${card.value}枚ドロー`;
+  return card.name;
+}
+
+function applyCardImage(el, card) {
+  if (!card.image) return;
+  if (Number.isInteger(card.spriteIndex)) {
+    const col = card.spriteIndex % 5;
+    const row = Math.floor(card.spriteIndex / 5);
+    el.style.backgroundImage = `url('${card.image}')`;
+    el.style.backgroundSize = '500% 500%';
+    el.style.backgroundPosition = `${col * 25}% ${row * 25}%`;
+    el.classList.add('has-image');
+    return;
+  }
+
+  const img = new Image();
+  img.onload = () => {
+    el.style.backgroundImage = `url('${card.image}')`;
+    el.classList.add('has-image');
+  };
+  img.src = card.image;
 }
 
 function renderCard(card, { owner, zone, slot = null } = {}) {
   const el = document.createElement('button');
   el.className = `card ${card.type}`;
   el.dataset.cardId = card.id;
+  el.title = label(card).replaceAll('\n', ' / ');
+  el.setAttribute('aria-label', el.title);
   el.innerHTML = `<span>${label(card).replaceAll('\n', '<br>')}</span>`;
-  const img = new Image();
-  img.onload = () => { el.style.backgroundImage = `url('${card.image}')`; el.classList.add('has-image'); };
-  img.src = card.image;
+  applyCardImage(el, card);
 
   if (zone === 'hand') {
     el.onclick = () => { selectedHandCard = card.id; selectedTributes = []; render(); };
@@ -126,6 +149,16 @@ function renderActions() {
         engine.summon(s.priorityPlayer, card.id, selectedTributes);
         selectedHandCard = null;
         selectedTributes = [];
+        render();
+      } catch (e) { alert(e.message); }
+    }));
+  }
+
+  if (card && engine.canActivateMainMagic(s.priorityPlayer, card.id)) {
+    root.appendChild(actionButton('発動', () => {
+      try {
+        engine.activateMainMagic(s.priorityPlayer, card.id);
+        selectedHandCard = null;
         render();
       } catch (e) { alert(e.message); }
     }));

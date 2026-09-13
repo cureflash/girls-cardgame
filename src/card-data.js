@@ -17,71 +17,132 @@ export const CHARACTERS = {
   },
 };
 
+const MADOKA_SPRITE = './assets/cards/madoka/cards.webp';
+
 let serial = 0;
 const uid = (prefix) => `${prefix}-${++serial}`;
+const art = (spriteIndex) => ({ image: MADOKA_SPRITE, spriteIndex });
 
-function familiar(rank, suit) {
+function familiar({ code, name, attack, spriteIndex }) {
   return {
-    id: uid(`${suit}${rank}`),
-    name: `${suit}${rank} 使い魔`,
+    id: uid(code),
+    code,
+    name,
     type: CARD_TYPES.FAMILIAR,
-    attack: rank,
-    rank,
-    suit,
-    image: `./assets/cards/${suit}_${rank}.png`,
+    attack,
+    rank: attack,
+    ...art(spriteIndex),
   };
 }
 
-function witch(rank, suit) {
+function witch({ code, name, attack, spriteIndex }) {
   return {
-    id: uid(`${suit}${rank}`),
-    name: `${suit}${rank} 魔女`,
+    id: uid(code),
+    code,
+    name,
     type: CARD_TYPES.WITCH,
-    attack: rank,
-    tributeThreshold: rank,
-    rank,
-    suit,
-    image: `./assets/cards/${suit}_${rank}.png`,
+    attack,
+    tributeThreshold: attack,
+    rank: attack,
+    ...art(spriteIndex),
   };
 }
 
-function boost(value, suit = '♠') {
+function boost(value, spriteIndex) {
   return {
-    id: uid(`${suit}M${value}`),
-    name: `${suit}${value} 攻撃魔法`,
+    id: uid(`boost-${value}`),
+    code: `boost-${value}`,
+    name: `こうげきアップ +${value}`,
     type: CARD_TYPES.MAGIC,
     chainable: true,
     effect: 'boost',
     value,
-    rank: value,
-    suit,
-    image: `./assets/cards/${suit}_${value}.png`,
+    ...art(spriteIndex),
   };
 }
 
-function ace(suit = 'A') {
+function drawTwo() {
   return {
-    id: uid(`${suit}A`),
-    name: `${suit}A 防御魔法`,
+    id: uid('draw-2'),
+    code: 'draw-2',
+    name: 'しあわせのカップ',
+    type: CARD_TYPES.MAGIC,
+    chainable: false,
+    effect: 'draw',
+    value: 2,
+    ...art(19),
+  };
+}
+
+function shield() {
+  return {
+    id: uid('shield'),
+    code: 'shield',
+    name: 'まもりのたて',
     type: CARD_TYPES.MAGIC,
     chainable: true,
     effect: 'nullifyDamage',
     value: 0,
-    rank: 1,
-    suit,
-    image: `./assets/cards/${suit}_A.png`,
+    ...art(20),
   };
 }
 
-// 試作用カードプール。正式なカード割当はこのファイルだけ差し替えればよい。
-export function createPrototypeDeck() {
+const FAMILIARS = [
+  ['cotton', '使い魔A', 3, 0],
+  ['cotton', '使い魔A', 4, 1],
+  ['cotton', '使い魔A', 5, 2],
+  ['nurse', '使い魔B', 3, 3],
+  ['nurse', '使い魔B', 4, 4],
+  ['nurse', '使い魔B', 5, 5],
+  ['vine', '使い魔C', 3, 6],
+  ['vine', '使い魔C', 4, 7],
+  ['vine', '使い魔C', 5, 8],
+  ['legs', '使い魔D', 3, 9],
+  ['legs', '使い魔D', 4, 10],
+  ['legs', '使い魔D', 5, 11],
+];
+
+function createFamiliars() {
+  return FAMILIARS.map(([family, name, attack, spriteIndex]) => familiar({
+    code: `familiar-${family}-${attack}`,
+    name,
+    attack,
+    spriteIndex,
+  }));
+}
+
+function createWitches() {
+  return [
+    witch({ code: 'witch-8-a', name: '8の魔女A', attack: 8, spriteIndex: 12 }),
+    witch({ code: 'witch-8-a', name: '8の魔女A', attack: 8, spriteIndex: 12 }),
+    witch({ code: 'witch-8-b', name: '8の魔女B', attack: 8, spriteIndex: 13 }),
+    witch({ code: 'witch-8-b', name: '8の魔女B', attack: 8, spriteIndex: 13 }),
+    witch({ code: 'witch-mermaid-a', name: '人魚の魔女', attack: 10, spriteIndex: 14 }),
+    witch({ code: 'witch-mermaid-b', name: '人魚の魔女', attack: 10, spriteIndex: 15 }),
+  ];
+}
+
+function createMagicCards() {
+  return [
+    boost(2, 16), boost(2, 16), boost(2, 16),
+    boost(3, 17), boost(3, 17), boost(3, 17),
+    boost(5, 18),
+    drawTwo(), drawTwo(),
+    shield(), shield(), shield(),
+  ];
+}
+
+// 30枚固定: 使い魔12 / 魔女6 / 魔法12。
+// まどかとマミは同一のカード構成を使い、画像スキンのみ別管理する想定。
+export function createMadokaDeck() {
   serial = 0;
-  const deck = [];
-  for (const suit of ['♦', '♣']) {
-    for (let n = 2; n <= 8; n++) deck.push(familiar(n, suit));
-    for (let n = 9; n <= 13; n++) deck.push(witch(n, suit));
-  }
-  for (let n = 2; n <= 13; n++) deck.push(boost(n, '♠'));
-  for (let i = 0; i < 4; i++) deck.push(ace('♥'));
-  return deck;
+  return [...createFamiliars(), ...createWitches(), ...createMagicCards()];
+}
+
+export function createMamiDeck() {
+  return createMadokaDeck().map(card => ({ ...card, image: null, spriteIndex: null }));
+}
+
+export function createPrototypeDeck() {
+  return createMadokaDeck();
 }
