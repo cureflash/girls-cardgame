@@ -15,6 +15,8 @@ jobs:
           node-version: '22'
       - name: Core regression tests
         run: node --test tests/engine.test.mjs tests/hand-tributes.test.mjs tests/rl-adapter.test.mjs tests/evaluation-ai.test.mjs tests/genetics.test.mjs tests/character-ai.test.mjs
+      - name: Mami image assets
+        run: node --test --test-name-pattern='Mami monster art uses dedicated non-placeholder WebP assets' tests/integration.test.mjs
       - name: 300-duel regression
         run: node --test --test-name-pattern='300 seeded random and tactical duels finish legally without card loss or deadlock' tests/integration.test.mjs
       - name: Split genetic trainer smoke

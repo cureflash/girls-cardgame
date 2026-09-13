@@ -11,8 +11,7 @@ const SKINS = {
   },
   mami: {
     familiars: [['nurse', 'お菓子の魔女の使い魔'], ['vine', '影の魔女の使い魔']],
-    // 芸術家の魔女の原寸画像は次の画像コミットで差し替える。それまでは欠損を避けるため既存画像を使う。
-    witches: [['shadow_8', '影の魔女', 8, 2], ['shadow_8', '芸術家の魔女', 8, 2], ['candy_a_10', 'お菓子の魔女 A', 10, 1], ['candy_b_10', 'お菓子の魔女 B', 10, 1], ['walpurgis_13', 'ワルプルギスの夜', 13, 1]],
+    witches: [['shadow_8', '影の魔女', 8, 2], ['artist_8', '芸術家の魔女', 8, 2], ['candy_a_10', 'お菓子の魔女 A', 10, 1], ['candy_b_10', 'お菓子の魔女 B', 10, 1], ['walpurgis_13', 'ワルプルギスの夜', 13, 1]],
   },
 };
 
@@ -23,7 +22,9 @@ export function createDeck(characterId) {
   const add = (code, data, copies = 1) => {
     for (let n = 0; n < copies; n++) cards.push({ id: `${characterId}-${cards.length + 1}`, code, ...data });
   };
-  const image = file => `./assets/cards/${characterId}/${file}.png?v=original1`;
+  const image = file => characterId === 'mami'
+    ? `./assets/cards/mami/${file}.webp?v=mami-hq1`
+    : `./assets/cards/madoka/${file}.png?v=original1`;
   for (const [family, name] of skin.familiars) {
     for (const attack of [3, 4, 5]) add(`familiar-${family}-${attack}`, { name, type: CARD_TYPES.FAMILIAR, attack, rank: attack, image: image(`familiar_${family}_${attack}`) }, 2);
   }
