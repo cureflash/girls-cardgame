@@ -58,3 +58,31 @@ jobs:
           name: best-response-confirmation
           path: /tmp/best-response-confirmation.json
           retention-days: 7
+      - name: Build current-meta bootstrap
+        if: contains(github.event.head_commit.message, '[retrain-current-meta]')
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { ACTIVE_GENOMES } from './src/evolved-genome.js';
+          fs.writeFileSync('/tmp/current-bootstrap.json', JSON.stringify({
+            format: 'girls-cardgame-eval-pair-v1',
+            madoka: ACTIVE_GENOMES.madoka,
+            mami: ACTIVE_GENOMES.mami,
+          }, null, 2));
+          NODE
+      - name: Retrain current-meta pair
+        if: contains(github.event.head_commit.message, '[retrain-current-meta]')
+        run: |
+          npm run ga:evolve -- --population 20 --generations 100 --opponents 6 --hall-opponents 4 --max-actions 300 --seed 20260914 --bootstrap /tmp/current-bootstrap.json --output /tmp/current-meta-ga
+          npm run ga:evaluate -- /tmp/current-meta-ga/latest.json --games 400 --seed 2026091401 --max-actions 300 | tee /tmp/current-meta-evaluation.json
+      - name: Upload current-meta pair
+        if: contains(github.event.head_commit.message, '[retrain-current-meta]')
+        uses: actions/upload-artifact@v4
+        with:
+          name: current-meta-ga
+          path: |
+            /tmp/current-meta-ga/latest.json
+            /tmp/current-meta-ga/latest-madoka.json
+            /tmp/current-meta-ga/latest-mami.json
+            /tmp/current-meta-evaluation.json
+          retention-days: 7
