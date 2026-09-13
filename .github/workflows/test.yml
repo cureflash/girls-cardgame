@@ -48,3 +48,13 @@ jobs:
           name: best-response-report
           path: /tmp/best-response.json
           retention-days: 7
+      - name: Paired best-response confirmation
+        if: contains(github.event.head_commit.message, '[confirm-best-response]')
+        run: node br/confirm.mjs --character madoka --games 100 --samples 16 --min-gain 0.05 --max-actions 220 --output /tmp/best-response-confirmation.json
+      - name: Upload best-response confirmation
+        if: contains(github.event.head_commit.message, '[confirm-best-response]')
+        uses: actions/upload-artifact@v4
+        with:
+          name: best-response-confirmation
+          path: /tmp/best-response-confirmation.json
+          retention-days: 7
