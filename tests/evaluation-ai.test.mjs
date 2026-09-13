@@ -48,7 +48,7 @@ test('action inspection exposes interpretable feature contributions', () => {
   assert.equal(tiro.features.turnEnds, 1);
 });
 
-test('shield action projection treats battle damage as zero', () => {
+function shieldBattleAdapter(defender) {
   const chars = [{ id:'madoka', name:'鹿目まどか' }, { id:'mami', name:'巴マミ' }];
   const pad = Array.from({ length: 20 }, (_, i) => familiar(`pad${i}`, 2));
   const engine = new GameEngine({
@@ -59,19 +59,30 @@ test('shield action projection treats battle damage as zero', () => {
   });
   engine.endTurn(0);
   engine.player(1).field[0] = familiar('attacker', 5);
-  engine.player(0).field[0] = familiar('defender', 8);
+  engine.player(0).field[0] = defender;
   engine.player(1).hand = [boost('up', 5)];
   engine.player(0).hand = [shield('shield')];
   engine.enterBattlePhase(1);
   engine.continueBattlePhase(1);
   engine.attack(1, 0, 0);
   engine.respondChain(1, 'up');
+  return new RLAdapter(engine);
+}
 
-  const adapter = new RLAdapter(engine);
-  const ranked = inspectEvaluationActions(adapter, 0, DEFAULT_GENOME);
+test('shield action projection treats battle damage as zero', () => {
+  const ranked = inspectEvaluationActions(shieldBattleAdapter(familiar('defender', 8)), 0, DEFAULT_GENOME);
   const pass = ranked.find(item => item.action === ACTIONS.PASS);
   const useShield = ranked.find(item => item.action !== ACTIONS.PASS);
   assert.ok(pass.features.damageToSelf > 0);
   assert.equal(useShield.features.shieldUse, 1);
   assert.equal(useShield.features.damageToSelf, 0);
+});
+
+test('shield action projection preserves a witch from destruction', () => {
+  const ranked = inspectEvaluationActions(shieldBattleAdapter(witch('defender-witch', 8)), 0, DEFAULT_GENOME);
+  const useShield = ranked.find(item => item.action !== ACTIONS.PASS);
+  assert.equal(useShield.features.shieldUse, 1);
+  assert.equal(useShield.features.damageToSelf, 0);
+  assert.equal(useShield.features.ownPowerLost, 0);
+  assert.equal(useShield.features.shieldSavedPower, 8 / 13);
 });
