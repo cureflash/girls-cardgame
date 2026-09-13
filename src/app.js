@@ -1,4 +1,4 @@
-import { GameEngine, CARD_TYPES, PHASES } from './game-engine.js?v=shield1';
+import { GameEngine, CARD_TYPES, PHASES } from './game-engine.js?v=handtribute1';
 import { CHARACTERS, createDeck } from './card-data.js';
 import { RLAdapter } from './rl-adapter.js';
 import { chooseBaselineAction } from './baseline-ai.js';
@@ -10,7 +10,7 @@ let selection = null, tributes = [], attacker = null, target = null;
 const node = (tag, className, text) => { const el = document.createElement(tag); el.className = className; if (text !== undefined) el.textContent = text; return el; };
 const typeName = card => ({ familiar: '使い魔', witch: '魔女', magic: '魔法' })[card.type];
 function description(card) {
-  if (card.type === CARD_TYPES.WITCH) return `攻撃力 ${card.attack}。生贄の攻撃力合計 ${card.tributeThreshold} 以上で召喚。`;
+  if (card.type === CARD_TYPES.WITCH) return `攻撃力 ${card.attack}。場の使い魔・魔女と手札の使い魔を生贄にし、攻撃力合計 ${card.tributeThreshold} 以上で召喚。`;
   if (card.type === CARD_TYPES.FAMILIAR) return `攻撃力 ${card.attack}。生贄なしで召喚できます。`;
   if (card.effect === 'draw') return 'メインフェイズに2枚ドロー。山札が0枚になると敗北します。';
   if (card.effect === 'boost') return `戦闘中の自分の使い魔・魔女の攻撃力を＋${card.value}。この戦闘のみ有効。`;
@@ -41,7 +41,6 @@ function perform(fn) {
   catch (error) { notify(error.message); render(); }
 }
 function finishAction() {
-  // Main-phase actions have no available opponent response. Return priority automatically.
   const s = engine.state;
   if (s.phase !== PHASES.GAME_OVER && !s.pendingDecision && s.priorityPlayer !== s.activePlayer) engine.passPriorityTo(s.activePlayer);
   const events = s.events.slice(eventCursor); eventCursor = s.events.length;
@@ -69,6 +68,19 @@ function button(text, fn, className = 'primary', disabled = false) {
 }
 function selectedCard() { return selection ? engine.player(selection.owner).hand.find(c => c.id === selection.id) : null; }
 function attackable(owner, slot) { return [...Array(5).keys(), null].some(t => engine.canAttack(owner, slot, t)); }
+function tributeKey(ref) { return ref.zone === 'field' ? `field:${ref.slot}` : `hand:${ref.id}`; }
+function tributeSelected(ref) { const key = tributeKey(ref); return tributes.some(item => tributeKey(item) === key); }
+function toggleTribute(ref) {
+  const key = tributeKey(ref);
+  tributes = tributeSelected(ref) ? tributes.filter(item => tributeKey(item) !== key) : [...tributes, ref];
+}
+function tributeTotal(playerIndex) {
+  const p = engine.player(playerIndex);
+  return tributes.reduce((total, ref) => {
+    const card = ref.zone === 'field' ? p.field[ref.slot] : p.hand.find(c => c.id === ref.id);
+    return total + (card?.attack ?? 0);
+  }, 0);
+}
 function cardButton(card, owner, zone, slot) {
   const b = node('button', `card ${card.type}`);
   b.dataset.cardId = card.id;
@@ -79,29 +91,44 @@ function cardButton(card, owner, zone, slot) {
   const caption = node('div', 'card-caption'); caption.append(node('span', 'card-name', card.name), node('b', 'card-value', card.attack ? `ATK ${card.attack}` : card.effect === 'boost' ? `＋${card.value}` : card.effect === 'draw' ? '2枚ドロー' : '破壊無効'));
   b.append(visual, caption);
   const selected = zone === 'hand' ? selection?.owner === owner && selection?.id === card.id : attacker?.owner === owner && attacker.slot === slot;
+  const asTribute = zone === 'field'
+    ? tributeSelected({ zone: 'field', slot })
+    : zone === 'hand' ? tributeSelected({ zone: 'hand', id: card.id }) : false;
   b.classList.toggle('selected', selected);
-  b.setAttribute('aria-pressed', String(selected));
+  b.classList.toggle('tribute', asTribute);
+  b.setAttribute('aria-pressed', String(selected || asTribute));
   b.onmouseenter = () => showDetail(card); b.onfocus = () => showDetail(card);
   b.onclick = () => {
     showDetail(card);
     if (!humanTurn() || engine.state.pendingDecision || engine.state.phase === PHASES.GAME_OVER) return;
     const player = adapter.currentPlayer();
-    if (zone === 'hand' && owner === player) { selection = { owner, id: card.id }; tributes = []; attacker = null; target = null; }
+    if (zone === 'hand' && owner === player) {
+      const witch = selectedCard();
+      if (witch?.type === CARD_TYPES.WITCH && witch.id !== card.id && card.type === CARD_TYPES.FAMILIAR && engine.canSummon(player, witch.id)) {
+        toggleTribute({ zone: 'hand', id: card.id });
+      } else if (selection?.owner === owner && selection?.id === card.id) {
+        clear();
+      } else {
+        selection = { owner, id: card.id }; tributes = []; attacker = null; target = null;
+      }
+    }
     if (zone === 'field' && owner === player) {
       const handCard = selectedCard();
-      if (handCard?.type === CARD_TYPES.WITCH && engine.canSummon(player, handCard.id)) tributes = tributes.includes(slot) ? tributes.filter(s => s !== slot) : [...tributes, slot];
+      if (handCard?.type === CARD_TYPES.WITCH && engine.canSummon(player, handCard.id)) toggleTribute({ zone: 'field', slot });
       else if (attackable(owner, slot)) { selection = null; tributes = []; attacker = { owner, slot }; target = null; }
     } else if (zone === 'field' && attacker && owner !== attacker.owner && engine.canAttack(attacker.owner, attacker.slot, slot)) target = slot;
     render();
   };
   if (humanTurn() && !engine.state.pendingDecision) {
+    const selectedWitch = selectedCard();
+    const canBeHandTribute = zone === 'hand' && owner === selection?.owner && selectedWitch?.type === CARD_TYPES.WITCH
+      && selectedWitch.id !== card.id && card.type === CARD_TYPES.FAMILIAR && engine.canSummon(owner, selectedWitch.id);
     const canPlay = zone === 'hand' && (engine.canSummon(owner, card.id) || engine.canActivateMainMagic(owner, card.id));
     const canAttack = zone === 'field' && attackable(owner, slot);
     const canTarget = zone === 'field' && attacker && owner !== attacker.owner && engine.canAttack(attacker.owner, attacker.slot, slot);
-    b.classList.toggle('playable', canPlay || canAttack);
+    b.classList.toggle('playable', canPlay || canAttack || canBeHandTribute);
     b.classList.toggle('targetable', !!canTarget);
     b.classList.toggle('target-selected', !!canTarget && target === slot);
-    b.classList.toggle('tribute', zone === 'field' && owner === selection?.owner && tributes.includes(slot));
     if (canAttack) visual.append(node('span', 'card-badge', '攻撃可能'));
   }
   if (zone === 'field' && card.attackedTurn === engine.state.turn) visual.append(node('span', 'card-badge used', '攻撃済み'));
@@ -148,10 +175,15 @@ function renderActions() {
       if (card) {
         hint = `${card.name}：${description(card)}`;
         if (card.type !== CARD_TYPES.MAGIC) {
-          const total = tributes.reduce((n, slot) => n + (engine.player(p).field[slot]?.attack || 0), 0);
-          if (card.type === CARD_TYPES.WITCH && engine.canSummon(p, card.id)) hint = `生贄を場から選択：合計 ${total} / 必要 ${card.tributeThreshold} 以上`;
-          root.append(button(card.type === CARD_TYPES.WITCH ? '生贄を捧げて召喚' : '召喚する', () => perform(() => engine.summon(p, card.id, tributes)), 'primary', !engine.canSummon(p, card.id) || (card.type === CARD_TYPES.WITCH && total < card.tributeThreshold)));
+          const total = tributeTotal(p);
+          const createsSpace = engine.player(p).field.includes(null) || tributes.some(ref => ref.zone === 'field');
+          if (card.type === CARD_TYPES.WITCH && engine.canSummon(p, card.id)) {
+            hint = `生贄を場・手札から選択：合計 ${total} / 必要 ${card.tributeThreshold} 以上。手札からは使い魔だけ選べます。`;
+          }
+          const tributeReady = card.type !== CARD_TYPES.WITCH || (total >= card.tributeThreshold && createsSpace);
+          root.append(button(card.type === CARD_TYPES.WITCH ? '生贄を捧げて召喚' : '召喚する', () => perform(() => engine.summon(p, card.id, tributes)), 'primary', !engine.canSummon(p, card.id) || !tributeReady));
         } else if (card.effect === 'draw') root.append(button('魔法を発動', () => perform(() => engine.activateMainMagic(p, card.id)), 'primary', !engine.canActivateMainMagic(p, card.id)));
+        root.append(button('選択を解除', () => { clear(); render(); }, 'quiet'));
       }
       root.append(button('バトルフェイズへ', () => perform(() => engine.enterBattlePhase(p)), 'secondary'));
     }
