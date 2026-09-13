@@ -4,15 +4,17 @@ import { RLAdapter } from '../src/rl-adapter.js';
 import { chooseEvaluationAction, normalizeEvaluationGenome } from '../src/evaluation-ai.js';
 import { mulberry32 } from './genetics.mjs';
 
+// Character-bound evaluation only needs the two seat arrangements.
 export const MATCH_VARIANTS = Object.freeze([
-  { characters: ['madoka', 'mami'], controllers: [0, 1], label: 'A-madoka-first' },
-  { characters: ['madoka', 'mami'], controllers: [1, 0], label: 'A-mami-second' },
-  { characters: ['mami', 'madoka'], controllers: [0, 1], label: 'A-mami-first' },
-  { characters: ['mami', 'madoka'], controllers: [1, 0], label: 'A-madoka-second' },
+  { characters: ['madoka', 'mami'], label: 'madoka-first', madokaSeat: 0 },
+  { characters: ['mami', 'madoka'], label: 'madoka-second', madokaSeat: 1 },
 ]);
 
-export function playGame(genomeA, genomeB, { variant = 0, seed = 1, maxActions = 600 } = {}) {
-  const genomes = [normalizeEvaluationGenome(genomeA), normalizeEvaluationGenome(genomeB)];
+export function playGame(madokaGenome, mamiGenome, { variant = 0, seed = 1, maxActions = 600 } = {}) {
+  const genomes = {
+    madoka: normalizeEvaluationGenome(madokaGenome),
+    mami: normalizeEvaluationGenome(mamiGenome),
+  };
   const setup = MATCH_VARIANTS[variant % MATCH_VARIANTS.length];
   const rng = mulberry32(seed);
   const players = setup.characters.map((id, i) => ({ id: `p${i}`, name: CHARACTERS[id].name, character: CHARACTERS[id] }));
@@ -22,36 +24,35 @@ export function playGame(genomeA, genomeB, { variant = 0, seed = 1, maxActions =
 
   while (engine.state.phase !== PHASES.GAME_OVER && actions < maxActions) {
     const player = adapter.currentPlayer();
-    const controller = setup.controllers[player];
-    const action = chooseEvaluationAction(adapter, player, genomes[controller], rng);
+    const character = engine.player(player).character.id;
+    const action = chooseEvaluationAction(adapter, player, genomes[character], rng);
     adapter.applyAction(action, player);
     actions += 1;
   }
 
   const winnerPlayer = engine.state.phase === PHASES.GAME_OVER ? engine.state.winner : null;
-  const winnerController = winnerPlayer === null ? null : setup.controllers[winnerPlayer];
-  const aPlayer = setup.controllers[0] === 0 ? 0 : 1;
+  const winnerCharacter = winnerPlayer === null ? null : engine.player(winnerPlayer).character.id;
   return {
     variant: setup.label,
-    winnerController,
+    winnerCharacter,
     winnerPlayer,
     actions,
     turn: engine.state.turn,
     truncated: winnerPlayer === null,
-    aCharacter: setup.characters[aPlayer],
-    aSeat: aPlayer,
+    madokaSeat: setup.madokaSeat,
+    mamiSeat: 1 - setup.madokaSeat,
   };
 }
 
-export function playSeries(genomeA, genomeB, { seed = 1, repeats = 1, maxActions = 600 } = {}) {
-  const result = { games: 0, winsA: 0, winsB: 0, draws: 0, truncated: 0, details: [] };
+export function playSeries(madokaGenome, mamiGenome, { seed = 1, repeats = 1, maxActions = 600 } = {}) {
+  const result = { games: 0, winsMadoka: 0, winsMami: 0, draws: 0, truncated: 0, details: [] };
   let game = 0;
   for (let repeat = 0; repeat < repeats; repeat++) {
     for (let variant = 0; variant < MATCH_VARIANTS.length; variant++) {
-      const detail = playGame(genomeA, genomeB, { variant, seed: seed + game * 7919, maxActions });
+      const detail = playGame(madokaGenome, mamiGenome, { variant, seed: seed + game * 7919, maxActions });
       result.games += 1;
-      if (detail.winnerController === 0) result.winsA += 1;
-      else if (detail.winnerController === 1) result.winsB += 1;
+      if (detail.winnerCharacter === 'madoka') result.winsMadoka += 1;
+      else if (detail.winnerCharacter === 'mami') result.winsMami += 1;
       else result.draws += 1;
       if (detail.truncated) result.truncated += 1;
       result.details.push(detail);
