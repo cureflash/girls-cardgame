@@ -1,5 +1,5 @@
 import { GameEngine, CARD_TYPES, PHASES } from './game-engine.js';
-import { CHARACTERS, createMadokaDeck, createMamiDeck } from './card-data.js?v=png1';
+import { CHARACTERS, createMadokaDeck, createMamiDeck } from './card-data.js?v=individual2';
 
 const $ = (sel) => document.querySelector(sel);
 let engine;
