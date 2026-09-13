@@ -17,7 +17,7 @@
     <label>あなた <select id="character"><option value="madoka">鹿目まどか</option><option value="mami">巴マミ</option></select></label>
     <label>対戦相手 <select id="mode"><option value="cpu">AI</option><option value="local">同じ画面で2人</option></select></label>
     <label>手番 <select id="seat"><option value="first">先攻</option><option value="second">後攻</option></select></label>
-    <span id="ai-name">基本AI</span><label class="file-button">学習済みAIを読み込む<input id="policy-file" type="file" accept=".json,application/json"></label>
+    <span id="ai-name">評価AI</span><label class="file-button">学習済みAIを読み込む<input id="policy-file" type="file" accept=".json,application/json"></label>
     <span class="settings-note">設定は新しいデュエルから</span>
   </div>
   <div id="notice" role="status" class="notice" hidden></div>
@@ -41,6 +41,6 @@
   <div id="effect-layer" aria-hidden="true"></div>
   <dialog id="decision" aria-labelledby="decision-title"><div id="modal"></div></dialog>
   <dialog id="restart"><h2>新しいデュエルを始めますか？</h2><p>現在の対戦は終了します。</p><div class="actions"><button id="cancel-restart" class="quiet">続ける</button><button id="confirm-restart" class="primary">新しく始める</button></div></dialog>
-  <script type="module" src="./src/app.js?v=handtribute1"></script>
+  <script type="module" src="./src/app.js?v=ga1"></script>
 </body>
 </html>

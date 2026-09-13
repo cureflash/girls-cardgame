@@ -1,0 +1,21 @@
+name: test
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Core regression tests
+        run: node --test tests/engine.test.mjs tests/hand-tributes.test.mjs tests/rl-adapter.test.mjs tests/evaluation-ai.test.mjs tests/genetics.test.mjs
+      - name: 300-duel regression
+        run: node --test --test-name-pattern='300 seeded random and tactical duels finish legally without card loss or deadlock' tests/integration.test.mjs
+      - name: Genetic trainer smoke
+        run: npm run ga:evolve -- --population 4 --generations 1 --opponents 1 --max-actions 200 --output /tmp/ga-smoke
