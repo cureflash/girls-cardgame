@@ -23,15 +23,17 @@ export function createDeck(characterId) {
     for (let n = 0; n < copies; n++) cards.push({ id: `${characterId}-${cards.length + 1}`, code, ...data });
   };
   const image = file => `./assets/cards/${characterId}/${file}.webp?v=cards-webp1`;
-  for (const [family, name] of skin.familiars) {
-    for (const attack of [3, 4, 5]) add(`familiar-${family}-${attack}`, { name, type: CARD_TYPES.FAMILIAR, attack, rank: attack, image: image(`familiar_${family}_${attack}`) }, 2);
-  }
+  skin.familiars.forEach(([family, name], familyIndex) => {
+    for (const attack of [3, 4, 5]) {
+      const copies = attack === 3 && familyIndex === 0 ? 3 : 2;
+      add(`familiar-${family}-${attack}`, { name, type: CARD_TYPES.FAMILIAR, attack, rank: attack, image: image(`familiar_${family}_${attack}`) }, copies);
+    }
+  });
   for (const [code, name, attack, copies] of skin.witches) add(`witch-${code}`, { name, type: CARD_TYPES.WITCH, attack, rank: attack, tributeThreshold: attack, image: image(`witch_${code}`) }, copies);
   const magic = (effect, name, value, file, copies, chainable) => add(`magic-${effect}-${value}`, { name, type: CARD_TYPES.MAGIC, effect, value, chainable, image: `./assets/cards/madoka/magic_${file}.webp?v=cards-webp1` }, copies);
   for (const [value, copies] of [[2, 3], [3, 3], [5, 1]]) magic('boost', `攻撃力＋${value}`, value, `attack_up_${value}`, copies, true);
-  magic('draw', 'ドロー魔法', 2, 'draw_two', 1, false);
   magic('nullifyDamage', '盾', 0, 'shield', 3, true);
-  return cards; // 30 = familiars 12 + witches 7 + magic 11
+  return cards; // 30 = familiars 13 + witches 7 + magic 10
 }
 export const createMadokaDeck = () => createDeck('madoka');
 export const createMamiDeck = () => createDeck('mami');
