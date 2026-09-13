@@ -262,7 +262,15 @@ export class GameEngine {
   canActivateMagic(playerIndex, card) {
     if (card.effect === 'boost') return !!this.state.battle
       && (!this.state.battle.direct || playerIndex === this.state.battle.attackerPlayer);
-    if (card.effect === 'nullifyDamage') return !!this.state.battle;
+    if (card.effect === 'nullifyDamage') {
+      const battle = this.state.battle;
+      if (!battle || battle.direct) return false;
+      const slot = playerIndex === battle.attackerPlayer
+        ? battle.attackerSlot
+        : playerIndex === battle.defenderPlayer ? battle.defenderSlot : null;
+      if (slot === null) return false;
+      return this.player(playerIndex).field[slot]?.type === CARD_TYPES.FAMILIAR;
+    }
     return false;
   }
 
@@ -310,6 +318,11 @@ export class GameEngine {
     this.state.chain.push({ player: playerIndex, card });
     this.state.chainPassCount = 0;
     this.log(`CHAIN ${this.state.chain.length}: ${p.name}が${card.name}を発動`);
+    if (card.effect === 'nullifyDamage') {
+      this.log(`${card.name}の発動でチェーン終了`);
+      this.resolveChainAndBattle();
+      return;
+    }
     this.beginChainWindow(this.opponent(playerIndex));
   }
 
@@ -330,6 +343,7 @@ export class GameEngine {
       if (playerIndex === battle.attackerPlayer) battle.attackerBonus += card.value ?? 0;
       else if (playerIndex === battle.defenderPlayer) battle.defenderBonus += card.value ?? 0;
     } else if (card.effect === 'nullifyDamage') {
+      // Legacy field name: true now means the shield prevents battle destruction of this player's familiar.
       battle.damagePrevented[playerIndex] = true;
     }
     this.player(playerIndex).graveyard.push(card);
@@ -340,17 +354,21 @@ export class GameEngine {
     const b = this.state.battle;
     const attackValue = b.attackerBase + b.attackerBonus;
     const defendValue = b.defenderBase + b.defenderBonus;
+    const shieldProtects = (playerIndex, slot) => {
+      if (!b.damagePrevented[playerIndex] || slot === null) return false;
+      return this.player(playerIndex).field[slot]?.type === CARD_TYPES.FAMILIAR;
+    };
 
     if (!b.direct && attackValue === defendValue) {
-      this.destroy(b.attackerPlayer, b.attackerSlot, 'battle');
-      this.destroy(b.defenderPlayer, b.defenderSlot, 'battle');
-      this.log(`同値のため両方を破壊（${attackValue} - ${defendValue}）`);
+      if (!shieldProtects(b.attackerPlayer, b.attackerSlot)) this.destroy(b.attackerPlayer, b.attackerSlot, 'battle');
+      if (!shieldProtects(b.defenderPlayer, b.defenderSlot)) this.destroy(b.defenderPlayer, b.defenderSlot, 'battle');
+      this.log(`同値のため戦闘解決（${attackValue} - ${defendValue}）`);
     } else {
       const loserPlayer = b.direct || attackValue > defendValue ? b.defenderPlayer : b.attackerPlayer;
       const loserSlot = attackValue > defendValue ? b.defenderSlot : b.attackerSlot;
       const rawDamage = b.direct ? attackValue : Math.abs(attackValue - defendValue);
-      if (!b.direct) this.destroy(loserPlayer, loserSlot, 'battle');
-      const damage = b.damagePrevented[loserPlayer] ? 0 : this.applyCharacterDamageReduction(loserPlayer, rawDamage);
+      if (!b.direct && !shieldProtects(loserPlayer, loserSlot)) this.destroy(loserPlayer, loserSlot, 'battle');
+      const damage = this.applyCharacterDamageReduction(loserPlayer, rawDamage);
       this.log(`${this.player(loserPlayer).name}に${b.direct ? '直接攻撃' : '戦闘'}ダメージ ${damage}`);
       this.emit('damage', { player: loserPlayer, amount: damage, rawAmount: rawDamage, direct: b.direct });
       if (damage > 0) this.takeDeckDamage(loserPlayer, damage);
