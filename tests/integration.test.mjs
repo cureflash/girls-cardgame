@@ -25,11 +25,36 @@ test('both decks share 12/7/11 composition, one draw, and their own 13 witch; al
   assert.equal(decks[1].filter(c=>c.name==='芸術家の魔女').length,2);
 });
 
-test('Mami PNGs retain original card dimensions instead of thumbnail placeholders', () => {
-  for(const file of new Set(createDeck('mami').filter(c=>c.type!=='magic').map(c=>c.image.split('?')[0]))) {
-    const b=readFileSync(new URL('../'+file,import.meta.url));
-    assert.equal(b.readUInt32BE(16),1024,file); assert.equal(b.readUInt32BE(20),1536,file);
+test('Mami monster art uses dedicated non-placeholder WebP assets', () => {
+  const monsters = createDeck('mami').filter(c => c.type !== 'magic');
+  const files = [...new Set(monsters.map(c => c.image.split('?')[0]))];
+  assert.equal(files.length, 11);
+
+  for (const file of files) {
+    assert.match(file, /\.webp$/);
+    const b = readFileSync(new URL('../' + file, import.meta.url));
+    assert.ok(b.length > 2500, file);
+    assert.equal(b.subarray(0, 4).toString(), 'RIFF', file);
+    assert.equal(b.subarray(8, 12).toString(), 'WEBP', file);
+
+    let marker = -1;
+    for (let i = 0; i < b.length - 7; i++) {
+      if (b[i] === 0x9d && b[i + 1] === 0x01 && b[i + 2] === 0x2a) {
+        marker = i;
+        break;
+      }
+    }
+    assert.ok(marker >= 0, file);
+    const width = b.readUInt16LE(marker + 3) & 0x3fff;
+    const height = b.readUInt16LE(marker + 5) & 0x3fff;
+    assert.ok(width >= 160, `${file}: width ${width}`);
+    assert.ok(height >= 240, `${file}: height ${height}`);
   }
+
+  const artist = monsters.find(c => c.name === '芸術家の魔女');
+  const shadow = monsters.find(c => c.name === '影の魔女');
+  assert.ok(artist && shadow);
+  assert.notEqual(artist.image, shadow.image);
 });
 
 test('300 seeded random and tactical duels finish legally without card loss or deadlock', () => {
