@@ -58,7 +58,11 @@ function renderCard(card, { owner, zone, slot = null } = {}) {
   applyCardImage(el, card);
 
   if (zone === 'hand') {
-    el.onclick = () => { selectedHandCard = card.id; selectedTributes = []; render(); };
+    el.onclick = () => {
+      selectedHandCard = card.id;
+      selectedTributes = [];
+      render();
+    };
     if (selectedHandCard === card.id) el.classList.add('selected');
   } else if (zone === 'field') {
     el.onclick = () => onFieldClick(owner, slot);
@@ -66,6 +70,12 @@ function renderCard(card, { owner, zone, slot = null } = {}) {
     if (selectedTributes.includes(slot) && owner === engine.state.priorityPlayer) el.classList.add('tribute');
   }
   return el;
+}
+
+function clearSelections() {
+  selectedHandCard = null;
+  selectedTributes = [];
+  selectedAttacker = null;
 }
 
 function render() {
@@ -111,27 +121,46 @@ function renderPlayer(index, selector) {
 function onFieldClick(owner, slot) {
   const s = engine.state;
   const priority = s.priorityPlayer;
+
   if (owner === priority && priority === s.activePlayer) {
     const chosen = engine.player(owner).field[slot];
     if (!chosen) return;
+
     if (selectedHandCard) {
       const handCard = engine.player(priority).hand.find(c => c.id === selectedHandCard);
-      if (handCard?.type === CARD_TYPES.WITCH && chosen.type === CARD_TYPES.FAMILIAR) {
-        selectedTributes = selectedTributes.includes(slot) ? selectedTributes.filter(x => x !== slot) : [...selectedTributes, slot];
+      if (
+        handCard?.type === CARD_TYPES.WITCH
+        && chosen.type === CARD_TYPES.FAMILIAR
+        && engine.canSummon(priority, handCard.id)
+      ) {
+        selectedTributes = selectedTributes.includes(slot)
+          ? selectedTributes.filter(x => x !== slot)
+          : [...selectedTributes, slot];
         render();
         return;
       }
     }
-    selectedAttacker = { owner, slot };
-    render();
-  } else if (selectedAttacker && selectedAttacker.owner === priority) {
-    try {
-      engine.attack(priority, selectedAttacker.slot, slot);
-      selectedAttacker = null;
-      selectedHandCard = null;
-      selectedTributes = [];
+
+    const opponent = engine.player(engine.opponent(owner));
+    const canAttackFromSlot = opponent.field.some((card, targetSlot) =>
+      !!card && engine.canAttack(owner, slot, targetSlot)
+    );
+    if (canAttackFromSlot) {
+      selectedAttacker = { owner, slot };
       render();
-    } catch (e) { alert(e.message); }
+    }
+    return;
+  }
+
+  if (selectedAttacker && selectedAttacker.owner === priority) {
+    try {
+      if (!engine.canAttack(priority, selectedAttacker.slot, slot)) return;
+      engine.attack(priority, selectedAttacker.slot, slot);
+      clearSelections();
+      render();
+    } catch (e) {
+      alert(e.message);
+    }
   }
 }
 
@@ -140,17 +169,20 @@ function renderActions() {
   const root = $('#actions');
   root.innerHTML = '';
   if (s.phase === PHASES.GAME_OVER || s.pendingDecision) return;
+
   const p = engine.player(s.priorityPlayer);
   const card = p.hand.find(c => c.id === selectedHandCard);
 
-  if (s.priorityPlayer === s.activePlayer && card && [CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(card.type)) {
+  if (card && engine.canSummon(s.priorityPlayer, card.id)) {
     root.appendChild(actionButton('召喚', () => {
       try {
         engine.summon(s.priorityPlayer, card.id, selectedTributes);
         selectedHandCard = null;
         selectedTributes = [];
         render();
-      } catch (e) { alert(e.message); }
+      } catch (e) {
+        alert(e.message);
+      }
     }));
   }
 
@@ -160,27 +192,67 @@ function renderActions() {
         engine.activateMainMagic(s.priorityPlayer, card.id);
         selectedHandCard = null;
         render();
-      } catch (e) { alert(e.message); }
+      } catch (e) {
+        alert(e.message);
+      }
+    }));
+  }
+
+  if (engine.canEnterBattlePhase(s.priorityPlayer)) {
+    root.appendChild(actionButton('バトルフェイズへ', () => {
+      try {
+        engine.enterBattlePhase(s.priorityPlayer);
+        clearSelections();
+        render();
+      } catch (e) {
+        alert(e.message);
+      }
     }));
   }
 
   if (engine.canUseSpecial(s.priorityPlayer)) {
     root.appendChild(actionButton(p.character.special, () => {
-      try { engine.activateSpecial(s.priorityPlayer); render(); } catch (e) { alert(e.message); }
+      try {
+        engine.activateSpecial(s.priorityPlayer);
+        clearSelections();
+        render();
+      } catch (e) {
+        alert(e.message);
+      }
     }, 'special-button'));
   }
 
-  if (s.priorityPlayer === s.activePlayer) {
+  if (engine.canContinueBattlePhase(s.priorityPlayer)) {
+    root.appendChild(actionButton('バトル開始', () => {
+      try {
+        engine.continueBattlePhase(s.priorityPlayer);
+        clearSelections();
+        render();
+      } catch (e) {
+        alert(e.message);
+      }
+    }));
+  }
+
+  if (engine.canEndTurn(s.priorityPlayer)) {
     root.appendChild(actionButton('ターン終了', () => {
       try {
         engine.endTurn(s.priorityPlayer);
-        selectedHandCard = null;
-        selectedAttacker = null;
+        clearSelections();
         render();
-      } catch (e) { alert(e.message); }
+      } catch (e) {
+        alert(e.message);
+      }
     }));
-  } else {
-    root.appendChild(actionButton('優先権を返す', () => { engine.passPriorityTo(s.activePlayer); render(); }));
+  } else if (s.priorityPlayer !== s.activePlayer) {
+    root.appendChild(actionButton('優先権を返す', () => {
+      try {
+        engine.passPriorityTo(s.activePlayer);
+        render();
+      } catch (e) {
+        alert(e.message);
+      }
+    }));
   }
 }
 
@@ -211,7 +283,10 @@ function renderModal() {
   const d = engine.state.pendingDecision;
   const backdrop = $('#modal-backdrop');
   const modal = $('#modal');
-  if (!d) { backdrop.classList.add('hidden'); return; }
+  if (!d) {
+    backdrop.classList.add('hidden');
+    return;
+  }
   backdrop.classList.remove('hidden');
   const p = engine.player(d.player);
   modal.innerHTML = `<h2>${p.name}</h2>`;
@@ -224,11 +299,17 @@ function renderModal() {
       const card = p.hand.find(c => c.id === id);
       if (!card) return;
       const b = renderCard(card);
-      b.onclick = () => { engine.respondChain(d.player, id); render(); };
+      b.onclick = () => {
+        engine.respondChain(d.player, id);
+        render();
+      };
       list.appendChild(b);
     });
     modal.appendChild(list);
-    modal.appendChild(actionButton('発動しない', () => { engine.respondChain(d.player, null); render(); }));
+    modal.appendChild(actionButton('発動しない', () => {
+      engine.respondChain(d.player, null);
+      render();
+    }));
   }
 
   if (d.type === 'MADOKA_REVIVE') {
@@ -239,7 +320,11 @@ function renderModal() {
       const card = p.graveyard.find(c => c.id === id);
       if (!card) return;
       const b = renderCard(card);
-      b.onclick = () => { engine.selectReviveTarget(d.player, id); render(); };
+      b.onclick = () => {
+        engine.selectReviveTarget(d.player, id);
+        clearSelections();
+        render();
+      };
       list.appendChild(b);
     });
     modal.appendChild(list);

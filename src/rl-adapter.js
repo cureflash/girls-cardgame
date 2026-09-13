@@ -14,18 +14,20 @@ const ATTACK_COUNT = RL_LIMITS.FIELD_SLOTS * RL_LIMITS.FIELD_SLOTS;
 export const ACTIONS = Object.freeze({
   PASS: 0,
   END_TURN: 1,
-  SPECIAL: 2,
-  SUMMON_BASE: 3,
-  ATTACK_BASE: 3 + SUMMON_COUNT,
-  MAIN_MAGIC_BASE: 3 + SUMMON_COUNT + ATTACK_COUNT,
-  CHAIN_BASE: 3 + SUMMON_COUNT + ATTACK_COUNT + RL_LIMITS.MAX_HAND,
-  REVIVE_BASE: 3 + SUMMON_COUNT + ATTACK_COUNT + RL_LIMITS.MAX_HAND * 2,
-  COUNT: 3 + SUMMON_COUNT + ATTACK_COUNT + RL_LIMITS.MAX_HAND * 3,
+  ENTER_BATTLE: 2,
+  CONTINUE_BATTLE: 3,
+  SPECIAL: 4,
+  SUMMON_BASE: 5,
+  ATTACK_BASE: 5 + SUMMON_COUNT,
+  MAIN_MAGIC_BASE: 5 + SUMMON_COUNT + ATTACK_COUNT,
+  CHAIN_BASE: 5 + SUMMON_COUNT + ATTACK_COUNT + RL_LIMITS.MAX_HAND,
+  REVIVE_BASE: 5 + SUMMON_COUNT + ATTACK_COUNT + RL_LIMITS.MAX_HAND * 2,
+  COUNT: 5 + SUMMON_COUNT + ATTACK_COUNT + RL_LIMITS.MAX_HAND * 3,
 });
 
 const CARD_FEATURES = 11;
 const CHAIN_FEATURES = 5;
-const GLOBAL_FEATURES = 24;
+const GLOBAL_FEATURES = 26;
 export const OBSERVATION_SIZE = GLOBAL_FEATURES
   + RL_LIMITS.MAX_HAND * CARD_FEATURES
   + RL_LIMITS.FIELD_SLOTS * CARD_FEATURES * 2
@@ -130,6 +132,8 @@ export class RLAdapter {
       s.activePlayer === playerIndex ? 1 : 0,
       s.priorityPlayer === playerIndex ? 1 : 0,
       s.phase === PHASES.MAIN ? 1 : 0,
+      s.phase === PHASES.BATTLE_START ? 1 : 0,
+      s.phase === PHASES.BATTLE ? 1 : 0,
       s.phase === PHASES.CHAIN ? 1 : 0,
       s.phase === PHASES.GAME_OVER ? 1 : 0,
       pending === null ? 1 : 0,
@@ -192,30 +196,30 @@ export class RLAdapter {
     const p = this.engine.player(playerIndex);
     const actions = [ACTIONS.PASS];
 
+    if (this.engine.canEndTurn(playerIndex)) actions.push(ACTIONS.END_TURN);
+    if (this.engine.canEnterBattlePhase(playerIndex)) actions.push(ACTIONS.ENTER_BATTLE);
+    if (this.engine.canContinueBattlePhase(playerIndex)) actions.push(ACTIONS.CONTINUE_BATTLE);
     if (this.engine.canUseSpecial(playerIndex)) actions.push(ACTIONS.SPECIAL);
 
-    if (s.activePlayer === playerIndex) {
-      actions.push(ACTIONS.END_TURN);
-      for (let i = 0; i < Math.min(p.hand.length, RL_LIMITS.MAX_HAND); i++) {
-        const card = p.hand[i];
-        if (this.engine.canActivateMainMagic(playerIndex, card.id)) actions.push(encodeMainMagic(i));
-        if (!this.engine.canSummon(playerIndex, card.id)) continue;
-        if (card.type === CARD_TYPES.FAMILIAR) {
-          actions.push(encodeSummon(i, 0));
-        } else if (card.type === CARD_TYPES.WITCH) {
-          for (const set of this.engine.validTributeSets(playerIndex, card)) {
-            actions.push(encodeSummon(i, tributeSlotsToMask(set.slots)));
-          }
+    for (let i = 0; i < Math.min(p.hand.length, RL_LIMITS.MAX_HAND); i++) {
+      const card = p.hand[i];
+      if (this.engine.canActivateMainMagic(playerIndex, card.id)) actions.push(encodeMainMagic(i));
+      if (!this.engine.canSummon(playerIndex, card.id)) continue;
+      if (card.type === CARD_TYPES.FAMILIAR) {
+        actions.push(encodeSummon(i, 0));
+      } else if (card.type === CARD_TYPES.WITCH) {
+        for (const set of this.engine.validTributeSets(playerIndex, card)) {
+          actions.push(encodeSummon(i, tributeSlotsToMask(set.slots)));
         }
       }
+    }
 
-      if (!(s.turn === 1 && playerIndex === 0)) {
-        const opp = this.engine.player(this.engine.opponent(playerIndex));
-        for (let a = 0; a < RL_LIMITS.FIELD_SLOTS; a++) {
-          if (!p.field[a]) continue;
-          for (let t = 0; t < RL_LIMITS.FIELD_SLOTS; t++) {
-            if (opp.field[t]) actions.push(encodeAttack(a, t));
-          }
+    const opp = this.engine.player(this.engine.opponent(playerIndex));
+    for (let a = 0; a < RL_LIMITS.FIELD_SLOTS; a++) {
+      if (!p.field[a]) continue;
+      for (let t = 0; t < RL_LIMITS.FIELD_SLOTS; t++) {
+        if (opp.field[t] && this.engine.canAttack(playerIndex, a, t)) {
+          actions.push(encodeAttack(a, t));
         }
       }
     }
@@ -264,6 +268,10 @@ export class RLAdapter {
       this.engine.passPriorityTo(this.engine.opponent(playerIndex));
     } else if (action === ACTIONS.END_TURN) {
       this.engine.endTurn(playerIndex);
+    } else if (action === ACTIONS.ENTER_BATTLE) {
+      this.engine.enterBattlePhase(playerIndex);
+    } else if (action === ACTIONS.CONTINUE_BATTLE) {
+      this.engine.continueBattlePhase(playerIndex);
     } else if (action === ACTIONS.SPECIAL) {
       this.stats.specials[playerIndex] += 1;
       this.engine.activateSpecial(playerIndex);

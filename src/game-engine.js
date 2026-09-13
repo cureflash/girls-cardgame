@@ -1,4 +1,10 @@
-export const PHASES = Object.freeze({ MAIN: 'MAIN', CHAIN: 'CHAIN', GAME_OVER: 'GAME_OVER' });
+export const PHASES = Object.freeze({
+  MAIN: 'MAIN',
+  BATTLE_START: 'BATTLE_START',
+  BATTLE: 'BATTLE',
+  CHAIN: 'CHAIN',
+  GAME_OVER: 'GAME_OVER',
+});
 export const CARD_TYPES = Object.freeze({ FAMILIAR: 'familiar', WITCH: 'witch', MAGIC: 'magic' });
 
 function cloneCard(card) {
@@ -16,6 +22,9 @@ export class GameEngine {
       phase: PHASES.MAIN,
       pendingDecision: null,
       chain: [],
+      chainPassCount: 0,
+      resumePhase: null,
+      battle: null,
       logs: [],
       winner: null,
       players: players.map((p, i) => ({
@@ -73,6 +82,8 @@ export class GameEngine {
   }
 
   canSummon(playerIndex, cardId) {
+    if (this.state.phase !== PHASES.MAIN || this.state.pendingDecision) return false;
+    if (this.state.activePlayer !== playerIndex || this.state.priorityPlayer !== playerIndex) return false;
     const p = this.player(playerIndex);
     const card = p.hand.find(c => c.id === cardId);
     if (!card || ![CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(card.type)) return false;
@@ -104,12 +115,10 @@ export class GameEngine {
 
   summon(playerIndex, cardId, tributeSlots = []) {
     this.ensurePriority(playerIndex);
-    if (this.state.activePlayer !== playerIndex) throw new Error('Only the active player can summon.');
+    if (!this.canSummon(playerIndex, cardId)) throw new Error('Card cannot be summoned in the current state.');
     const p = this.player(playerIndex);
     const handIndex = p.hand.findIndex(c => c.id === cardId);
-    if (handIndex < 0) throw new Error('Card is not in hand.');
     const card = p.hand[handIndex];
-    if (![CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(card.type)) throw new Error('Not a monster card.');
     const emptySlot = p.field.indexOf(null);
     if (emptySlot < 0) throw new Error('Monster zones are full.');
 
@@ -153,13 +162,52 @@ export class GameEngine {
     if (this.state.phase !== PHASES.GAME_OVER) this.passPriorityTo(this.opponent(playerIndex));
   }
 
-  attack(playerIndex, attackerSlot, targetSlot) {
+  canEnterBattlePhase(playerIndex) {
+    return this.state.phase === PHASES.MAIN
+      && !this.state.pendingDecision
+      && this.state.activePlayer === playerIndex
+      && this.state.priorityPlayer === playerIndex;
+  }
+
+  enterBattlePhase(playerIndex) {
     this.ensurePriority(playerIndex);
-    if (this.state.activePlayer !== playerIndex) throw new Error('Only the active player can attack.');
-    if (this.state.turn === 1 && playerIndex === 0) throw new Error('First player cannot attack on turn 1.');
+    if (!this.canEnterBattlePhase(playerIndex)) throw new Error('Battle phase cannot be entered now.');
+    this.state.phase = PHASES.BATTLE_START;
+    this.state.priorityPlayer = playerIndex;
+    this.log(`${this.player(playerIndex).name}がバトルフェイズ開始時へ`);
+    this.openPriorityWindow();
+  }
+
+  canContinueBattlePhase(playerIndex) {
+    return this.state.phase === PHASES.BATTLE_START
+      && !this.state.pendingDecision
+      && this.state.activePlayer === playerIndex
+      && this.state.priorityPlayer === playerIndex;
+  }
+
+  continueBattlePhase(playerIndex) {
+    this.ensurePriority(playerIndex);
+    if (!this.canContinueBattlePhase(playerIndex)) throw new Error('Battle phase cannot continue now.');
+    this.state.phase = PHASES.BATTLE;
+    this.state.priorityPlayer = playerIndex;
+    this.log(`${this.player(playerIndex).name}のバトルフェイズ`);
+    this.openPriorityWindow();
+  }
+
+  canAttack(playerIndex, attackerSlot, targetSlot) {
+    if (this.state.phase !== PHASES.BATTLE || this.state.pendingDecision) return false;
+    if (this.state.activePlayer !== playerIndex || this.state.priorityPlayer !== playerIndex) return false;
+    if (this.state.turn === 1 && playerIndex === 0) return false;
     const attacker = this.player(playerIndex).field[attackerSlot];
     const defender = this.player(this.opponent(playerIndex)).field[targetSlot];
-    if (!attacker || !defender) throw new Error('Both attacker and target are required.');
+    return !!attacker && !!defender;
+  }
+
+  attack(playerIndex, attackerSlot, targetSlot) {
+    this.ensurePriority(playerIndex);
+    if (!this.canAttack(playerIndex, attackerSlot, targetSlot)) throw new Error('Attack is not legal in the current state.');
+    const attacker = this.player(playerIndex).field[attackerSlot];
+    const defender = this.player(this.opponent(playerIndex)).field[targetSlot];
 
     this.state.battle = {
       attackerPlayer: playerIndex,
@@ -172,6 +220,7 @@ export class GameEngine {
       defenderBonus: 0,
       damageNullifiedFor: null,
     };
+    this.state.resumePhase = PHASES.BATTLE;
     this.log(`${attacker.name}が${defender.name}を攻撃`);
     this.state.chainPassCount = 0;
     this.beginChainWindow(playerIndex);
@@ -240,7 +289,7 @@ export class GameEngine {
       const item = this.state.chain.pop();
       this.resolveMagic(item.player, item.card);
     }
-    this.state.phase = PHASES.MAIN;
+    this.state.phase = this.state.resumePhase ?? PHASES.BATTLE;
     if (this.state.battle) this.resolveBattle();
   }
 
@@ -279,7 +328,11 @@ export class GameEngine {
 
     this.state.battle = null;
     this.state.chainPassCount = 0;
-    if (this.state.phase !== PHASES.GAME_OVER) this.openPriorityWindow();
+    this.state.resumePhase = null;
+    if (this.state.phase !== PHASES.GAME_OVER) {
+      this.state.phase = PHASES.BATTLE;
+      this.openPriorityWindow();
+    }
   }
 
   applyCharacterDamageReduction(playerIndex, damage) {
@@ -306,9 +359,9 @@ export class GameEngine {
   }
 
   canUseSpecial(playerIndex) {
+    if (this.state.phase !== PHASES.BATTLE_START || this.state.pendingDecision) return false;
+    if (this.state.activePlayer !== playerIndex || this.state.priorityPlayer !== playerIndex) return false;
     const p = this.player(playerIndex);
-    if (this.state.phase === PHASES.GAME_OVER || this.state.pendingDecision) return false;
-    if (this.state.priorityPlayer !== playerIndex) return false;
     if (p.character?.id === 'madoka') {
       return p.field.includes(null) && p.graveyard.some(c => [CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(c.type));
     }
@@ -318,11 +371,11 @@ export class GameEngine {
 
   activateSpecial(playerIndex) {
     this.ensurePriority(playerIndex);
-    const p = this.player(playerIndex);
     if (!this.canUseSpecial(playerIndex)) throw new Error('Special move cannot be activated.');
+    const p = this.player(playerIndex);
     if (p.character.id === 'mami') {
       this.resolveTiroFinale(playerIndex);
-      this.passPriorityTo(this.opponent(playerIndex));
+      this._finishTurnAfterSpecial(playerIndex);
       return;
     }
     if (p.character.id === 'madoka') {
@@ -331,7 +384,6 @@ export class GameEngine {
         player: playerIndex,
         options: p.graveyard.filter(c => [CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(c.type)).map(c => c.id),
       };
-      return;
     }
   }
 
@@ -358,15 +410,38 @@ export class GameEngine {
     p.field[slot] = card;
     this.state.pendingDecision = null;
     this.log(`${p.name}「プルウィア☆マギカ」— ${card.name}を蘇生`);
-    this.passPriorityTo(this.opponent(playerIndex));
+    this._finishTurnAfterSpecial(playerIndex);
+  }
+
+  canEndTurn(playerIndex) {
+    return !this.state.pendingDecision
+      && this.state.activePlayer === playerIndex
+      && this.state.priorityPlayer === playerIndex
+      && [PHASES.MAIN, PHASES.BATTLE].includes(this.state.phase);
   }
 
   endTurn(playerIndex) {
     this.ensurePriority(playerIndex);
-    if (this.state.activePlayer !== playerIndex) throw new Error('Only the active player can end the turn.');
+    if (!this.canEndTurn(playerIndex)) throw new Error('Turn cannot end in the current state.');
+    this._advanceTurn(playerIndex);
+  }
+
+  _finishTurnAfterSpecial(playerIndex) {
+    this.log(`${this.player(playerIndex).name}は必殺技を使ったためバトルフェイズをスキップ`);
+    this._advanceTurn(playerIndex);
+  }
+
+  _advanceTurn(playerIndex) {
+    if (this.state.activePlayer !== playerIndex) throw new Error('Only the active player can advance the turn.');
+    this.state.pendingDecision = null;
+    this.state.chain = [];
+    this.state.chainPassCount = 0;
+    this.state.battle = null;
+    this.state.resumePhase = null;
     this.state.turn += 1;
     this.state.activePlayer = this.opponent(playerIndex);
     this.state.priorityPlayer = this.state.activePlayer;
+    this.state.phase = PHASES.MAIN;
     this.draw(this.state.activePlayer, 1);
     if (this.state.phase !== PHASES.GAME_OVER) {
       this.log(`ターン${this.state.turn}: ${this.player(this.state.activePlayer).name}`);
@@ -375,19 +450,21 @@ export class GameEngine {
   }
 
   passPriorityTo(playerIndex) {
+    if (this.state.phase === PHASES.GAME_OVER) throw new Error('Game is over.');
+    if (this.state.pendingDecision) throw new Error('A decision is pending.');
     this.state.priorityPlayer = playerIndex;
     this.openPriorityWindow();
   }
 
   openPriorityWindow() {
     if (this.state.phase === PHASES.GAME_OVER || this.state.pendingDecision) return;
-    this.state.phase = PHASES.MAIN;
   }
 
   endGame(winnerIndex, reason) {
     this.state.phase = PHASES.GAME_OVER;
     this.state.winner = winnerIndex;
     this.state.pendingDecision = null;
+    this.state.resumePhase = null;
     this.log(`${this.player(winnerIndex).name}の勝利: ${reason}`);
   }
 }

@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { GameEngine, CARD_TYPES } from '../src/game-engine.js';
+import { GameEngine, CARD_TYPES, PHASES } from '../src/game-engine.js';
 import { createMadokaDeck } from '../src/card-data.js';
 
-const familiar = (id, atk) => ({ id, name:id, type:CARD_TYPES.FAMILIAR, attack:atk });
-const witch = (id, atk, threshold) => ({ id, name:id, type:CARD_TYPES.WITCH, attack:atk, tributeThreshold:threshold });
+const familiar = (id, atk) => ({ id, name:id, type:CARD_TYPES.FAMILIAR, attack:atk, rank:atk });
+const witch = (id, atk, threshold) => ({ id, name:id, type:CARD_TYPES.WITCH, attack:atk, tributeThreshold:threshold, rank:atk });
 const boost = (id, value) => ({ id, name:id, type:CARD_TYPES.MAGIC, chainable:true, effect:'boost', value });
 const nullify = (id) => ({ id, name:id, type:CARD_TYPES.MAGIC, chainable:true, effect:'nullifyDamage' });
 const drawTwo = (id) => ({ id, name:id, type:CARD_TYPES.MAGIC, chainable:false, effect:'draw', value:2 });
@@ -29,7 +29,7 @@ test('Mami starts with one additional card', () => {
   assert.equal(e.player(1).hand.length, 1);
 });
 
-test('witch requires familiar tribute attack threshold', () => {
+test('witch requires familiar tribute attack threshold in main phase', () => {
   const e = engine();
   const p=e.player(0);
   p.hand=[familiar('f8x',8),witch('wx',12,8)];
@@ -41,63 +41,113 @@ test('witch requires familiar tribute attack threshold', () => {
   assert.equal(p.graveyard.some(c=>c.id==='f8x'),true);
 });
 
-test('Madoka reduces battle damage by one', () => {
+test('summoning is main-phase only and attacking is battle-phase only', () => {
   const e = engine();
-  e.state.turn=2; e.state.activePlayer=1; e.state.priorityPlayer=1;
+  e.player(0).hand=[familiar('f3',3)];
+  e.player(0).field[0]=familiar('atk',5);
+  e.player(1).field[0]=familiar('def',4);
+
+  assert.equal(e.state.phase, PHASES.MAIN);
+  assert.equal(e.canSummon(0,'f3'), true);
+  assert.equal(e.canAttack(0,0,0), false);
+  assert.throws(() => e.attack(0,0,0));
+
+  e.enterBattlePhase(0);
+  assert.equal(e.state.phase, PHASES.BATTLE_START);
+  assert.equal(e.canSummon(0,'f3'), false);
+  assert.equal(e.canAttack(0,0,0), false);
+
+  e.continueBattlePhase(0);
+  assert.equal(e.state.phase, PHASES.BATTLE);
+  assert.equal(e.canSummon(0,'f3'), false);
+  assert.equal(e.canAttack(0,0,0), false, 'first player still cannot attack on turn 1');
+});
+
+test('Madoka reduces battle damage by one and chain resolution returns to battle phase', () => {
+  const e = engine();
+  e.endTurn(0);
   e.player(1).field[0]=familiar('atk',8);
   e.player(0).field[0]=familiar('def',5);
+  e.enterBattlePhase(1);
+  e.continueBattlePhase(1);
   const before=e.player(0).deck.length;
   e.attack(1,0,0);
   while(e.state.pendingDecision) e.respondChain(e.state.pendingDecision.player,null);
   assert.equal(before-e.player(0).deck.length,2);
+  assert.equal(e.state.phase, PHASES.BATTLE);
 });
 
-test('Tiro Finale destroys all monsters and cannot be chained', () => {
+test('Tiro Finale is available only at battle start and skips the battle phase', () => {
   const e=engine();
   e.player(0).field[0]=familiar('a1',3);
   e.player(1).field[0]=familiar('b1',4);
-  e.state.priorityPlayer=1;
+  e.endTurn(0);
+
+  assert.equal(e.canUseSpecial(1), false);
+  e.enterBattlePhase(1);
+  assert.equal(e.state.phase, PHASES.BATTLE_START);
+  assert.equal(e.canUseSpecial(1), true);
+
   e.activateSpecial(1);
   assert.equal(e.player(0).field.filter(Boolean).length,0);
   assert.equal(e.player(1).field.filter(Boolean).length,0);
   assert.equal(e.state.pendingDecision,null);
+  assert.equal(e.state.activePlayer,0);
+  assert.equal(e.state.phase,PHASES.MAIN);
+  assert.equal(e.state.turn,3);
 });
 
-test('Pluvia Magica revives one familiar or witch', () => {
+test('Pluvia Magica revives one monster then skips battle and ends the turn', () => {
   const e=engine();
   e.player(0).graveyard.push(familiar('dead',7));
-  e.state.priorityPlayer=0;
+
+  assert.equal(e.canUseSpecial(0), false);
+  e.enterBattlePhase(0);
+  assert.equal(e.canUseSpecial(0), true);
   e.activateSpecial(0);
   assert.equal(e.state.pendingDecision.type,'MADOKA_REVIVE');
+
   e.selectReviveTarget(0,'dead');
   assert.equal(e.player(0).field.some(c=>c?.id==='dead'),true);
+  assert.equal(e.state.activePlayer,1);
+  assert.equal(e.state.phase,PHASES.MAIN);
+  assert.equal(e.state.turn,2);
 });
 
-test('chain prompts the acting player, then the opponent, and resolves after both are done', () => {
+test('continuing past battle start closes the special-move window', () => {
   const e=engine();
-  e.state.turn=2; e.state.activePlayer=0; e.state.priorityPlayer=0;
+  e.player(0).graveyard.push(familiar('dead',7));
+  e.enterBattlePhase(0);
+  assert.equal(e.canUseSpecial(0), true);
+  e.continueBattlePhase(0);
+  assert.equal(e.state.phase,PHASES.BATTLE);
+  assert.equal(e.canUseSpecial(0), false);
+  assert.throws(() => e.activateSpecial(0));
+});
+
+test('chain prompts both players and resolves back into battle phase', () => {
+  const e=engine();
+  e.endTurn(0);
+  e.endTurn(1);
   e.player(0).field[0]=familiar('a5',5);
   e.player(1).field[0]=familiar('b8',8);
   e.player(0).hand=[boost('p0s10',10)];
   e.player(1).hand=[boost('p1s6',6)];
+
+  e.enterBattlePhase(0);
+  e.continueBattlePhase(0);
   e.attack(0,0,0);
+  assert.equal(e.state.phase,PHASES.CHAIN);
   assert.equal(e.state.pendingDecision.player,0);
   e.respondChain(0,'p0s10');
   assert.equal(e.state.pendingDecision.player,1);
   e.respondChain(1,'p1s6');
   assert.equal(e.state.pendingDecision,null);
   assert.equal(e.player(1).field[0],null);
+  assert.equal(e.state.phase,PHASES.BATTLE);
 });
 
-test('special moves can be reused whenever the player has priority', () => {
-  const e=engine();
-  e.state.priorityPlayer=1;
-  e.activateSpecial(1);
-  e.passPriorityTo(1);
-  assert.equal(e.canUseSpecial(1), true);
-});
-
-test('draw-two magic is a main-phase action and draws two cards', () => {
+test('draw-two magic remains a main-phase action', () => {
   const e=engine();
   const p=e.player(0);
   p.hand=[drawTwo('cup')];
@@ -106,6 +156,15 @@ test('draw-two magic is a main-phase action and draws two cards', () => {
   assert.equal(p.hand.length,2);
   assert.equal(before-p.deck.length,2);
   assert.equal(p.graveyard.some(c=>c.id==='cup'),true);
+});
+
+test('main-phase magic is not legal after entering battle phase', () => {
+  const e=engine();
+  const p=e.player(0);
+  p.hand=[drawTwo('cup')];
+  e.enterBattlePhase(0);
+  assert.equal(e.canActivateMainMagic(0,'cup'), false);
+  assert.throws(() => e.activateMainMagic(0,'cup'));
 });
 
 test('Madoka deck is exactly 30 cards with the agreed distribution', () => {
