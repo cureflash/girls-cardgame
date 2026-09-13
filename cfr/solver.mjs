@@ -10,8 +10,8 @@ import {
 import { CHARACTERS, createDeck } from '../src/card-data.js';
 import { chooseBaselineAction } from '../src/baseline-ai.js';
 
-export const SOLVER_FORMAT = 'girls-cardgame-regret-policy-v2';
-export const SOLVER_ALGORITHM = 'abstract-information-set-rollout-regret-matching';
+export const SOLVER_FORMAT = 'girls-cardgame-regret-policy-v3';
+export const SOLVER_ALGORITHM = 'bucketed-information-set-rollout-regret-matching';
 
 export function seededRng(seed = 1) {
   let state = Number(seed) >>> 0;
@@ -21,28 +21,51 @@ export function seededRng(seed = 1) {
   };
 }
 
-function mechanicalCard(card, turn) {
-  if (!card) return null;
+const clip = (n, max = 2) => Math.min(max, Math.max(0, n ?? 0));
+const count = (cards, predicate) => cards.reduce((n, card) => n + Number(Boolean(card && predicate(card))), 0);
+const deckBucket = n => n <= 3 ? 0 : n <= 7 ? 1 : n <= 11 ? 2 : n <= 15 ? 3 : n <= 20 ? 4 : 5;
+const handBucket = n => n <= 2 ? 0 : n <= 5 ? 1 : n <= 8 ? 2 : 3;
+const turnBucket = n => n <= 2 ? 0 : n <= 4 ? 1 : n <= 8 ? 2 : n <= 12 ? 3 : 4;
+
+function handProfile(cards) {
+  const familiars = cards.filter(card => card?.type === CARD_TYPES.FAMILIAR);
+  const witches = cards.filter(card => card?.type === CARD_TYPES.WITCH);
+  const boosts = cards.filter(card => card?.effect === 'boost');
   return {
-    type: card.type ?? null,
-    attack: card.attack ?? null,
-    tributeThreshold: card.tributeThreshold ?? null,
-    effect: card.effect ?? null,
-    value: card.value ?? null,
-    attacked: card.attackedTurn === turn,
+    size: handBucket(cards.length),
+    f3: clip(count(familiars, card => card.attack === 3)),
+    f4: clip(count(familiars, card => card.attack === 4)),
+    f5: clip(count(familiars, card => card.attack === 5)),
+    familiarCount: clip(familiars.length, 3),
+    familiarPower: Math.min(4, Math.floor(familiars.reduce((sum, card) => sum + (card.attack ?? 0), 0) / 5)),
+    w8: clip(count(witches, card => card.attack === 8)),
+    w10: clip(count(witches, card => card.attack === 10)),
+    w13: clip(count(witches, card => card.attack === 13)),
+    b2: clip(count(boosts, card => card.value === 2)),
+    b3: clip(count(boosts, card => card.value === 3)),
+    b5: clip(count(boosts, card => card.value === 5)),
+    shield: clip(count(cards, card => card.effect === 'nullifyDamage')),
   };
 }
 
-function canonicalCards(cards, turn, { keepNulls = false } = {}) {
-  const encoded = cards
-    .filter(card => keepNulls || card)
-    .map(card => JSON.stringify(mechanicalCard(card, turn)))
-    .sort();
-  return encoded;
+function graveProfile(cards) {
+  const monsters = cards.filter(card => [CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(card?.type));
+  return {
+    m3: clip(count(monsters, card => card.attack === 3)),
+    m4: clip(count(monsters, card => card.attack === 4)),
+    m5: clip(count(monsters, card => card.attack === 5)),
+    m8: clip(count(monsters, card => card.attack === 8)),
+    m10: clip(count(monsters, card => card.attack === 10)),
+    m13: clip(count(monsters, card => card.attack === 13)),
+    best: monsters.reduce((best, card) => Math.max(best, card.attack ?? 0), 0),
+  };
 }
 
-function sameNumbers(a, b) {
-  return a.length === b.length && a.every((value, index) => value === b[index]);
+function fieldProfile(field, turn) {
+  return field
+    .filter(Boolean)
+    .map(card => [card.attack ?? 0, card.attackedTurn === turn ? 1 : 0])
+    .sort((a, b) => a[0] - b[0] || a[1] - b[1]);
 }
 
 function witchPlanForAction(adapter, playerIndex, handIndex, tributeMask) {
@@ -51,19 +74,20 @@ function witchPlanForAction(adapter, playerIndex, handIndex, tributeMask) {
   if (!card || card.type !== CARD_TYPES.WITCH) return null;
   const slots = tributeMaskToSlots(tributeMask).sort((a, b) => a - b);
   const plan = adapter.engine.validTributeSets(playerIndex, card)
-    .find(candidate => sameNumbers([...candidate.slots].sort((a, b) => a - b), slots));
+    .find(candidate => {
+      const candidateSlots = [...candidate.slots].sort((a, b) => a - b);
+      return candidateSlots.length === slots.length && candidateSlots.every((slot, i) => slot === slots[i]);
+    });
   if (!plan) return null;
-  const field = slots
-    .map(slot => p.field[slot])
-    .filter(Boolean)
-    .map(tribute => tribute.attack ?? 0)
-    .sort((a, b) => a - b);
-  const hand = plan.handIds
-    .map(id => p.hand.find(candidate => candidate.id === id))
-    .filter(Boolean)
-    .map(tribute => tribute.attack ?? 0)
-    .sort((a, b) => a - b);
-  return { slots, field, hand, total: plan.total };
+  const fieldCards = slots.map(slot => p.field[slot]).filter(Boolean);
+  const handCards = plan.handIds.map(id => p.hand.find(candidate => candidate.id === id)).filter(Boolean);
+  return {
+    slots,
+    total: plan.total,
+    fieldCount: fieldCards.length,
+    fieldPower: fieldCards.reduce((sum, tribute) => sum + (tribute.attack ?? 0), 0),
+    handCount: handCards.length,
+  };
 }
 
 export function actionDescriptor(adapter, action, playerIndex = adapter.currentPlayer()) {
@@ -83,9 +107,7 @@ export function actionDescriptor(adapter, action, playerIndex = adapter.currentP
     if (!card) return 'summon:missing';
     if (card.type === CARD_TYPES.FAMILIAR) return `summon:familiar:${card.attack ?? 0}`;
     const plan = witchPlanForAction(adapter, playerIndex, handIndex, tributeMask);
-    const field = plan?.field?.join('+') ?? '';
-    const hand = plan?.hand?.join('+') ?? '';
-    return `summon:witch:${card.attack ?? 0}:F[${field}]:H[${hand}]`;
+    return `summon:witch:${card.attack ?? 0}:field${Math.min(2, plan?.fieldCount ?? 0)}`;
   }
 
   if (action >= ACTIONS.ATTACK_BASE && action < ACTIONS.MAIN_MAGIC_BASE) {
@@ -98,25 +120,33 @@ export function actionDescriptor(adapter, action, playerIndex = adapter.currentP
   }
 
   if (action >= ACTIONS.MAIN_MAGIC_BASE && action < ACTIONS.CHAIN_BASE) {
-    const handIndex = action - ACTIONS.MAIN_MAGIC_BASE;
-    const card = p.hand[handIndex];
+    const card = p.hand[action - ACTIONS.MAIN_MAGIC_BASE];
     return `main-magic:${card?.effect ?? 'unknown'}:${card?.value ?? 0}`;
   }
-
   if (action >= ACTIONS.CHAIN_BASE && action < ACTIONS.REVIVE_BASE) {
-    const handIndex = action - ACTIONS.CHAIN_BASE;
-    const card = p.hand[handIndex];
+    const card = p.hand[action - ACTIONS.CHAIN_BASE];
     if (card?.effect === 'nullifyDamage') return 'chain:shield';
     if (card?.effect === 'boost') return `chain:boost:${card.value ?? 0}`;
     return `chain:${card?.effect ?? 'unknown'}`;
   }
-
   if (action >= ACTIONS.REVIVE_BASE && action < ACTIONS.COUNT) {
-    const graveIndex = action - ACTIONS.REVIVE_BASE;
-    const card = p.graveyard[graveIndex];
-    return `revive:${card?.type ?? 'unknown'}:${card?.attack ?? 0}`;
+    const card = p.graveyard[action - ACTIONS.REVIVE_BASE];
+    return `revive:${card?.attack ?? 0}`;
   }
   return `action:${action}`;
+}
+
+function concreteCost(adapter, action, playerIndex) {
+  if (action < ACTIONS.SUMMON_BASE || action >= ACTIONS.ATTACK_BASE) return action;
+  const offset = action - ACTIONS.SUMMON_BASE;
+  const handIndex = Math.floor(offset / RL_LIMITS.TRIBUTE_MASKS);
+  const tributeMask = offset % RL_LIMITS.TRIBUTE_MASKS;
+  const card = adapter.engine.player(playerIndex).hand[handIndex];
+  if (card?.type !== CARD_TYPES.WITCH) return handIndex;
+  const plan = witchPlanForAction(adapter, playerIndex, handIndex, tributeMask);
+  if (!plan) return 1e9;
+  const overshoot = Math.max(0, plan.total - (card.tributeThreshold ?? 0));
+  return overshoot * 1000 + plan.fieldPower * 20 + plan.fieldCount * 10 + plan.handCount;
 }
 
 function actionGroups(adapter, playerIndex, legalActions) {
@@ -126,6 +156,7 @@ function actionGroups(adapter, playerIndex, legalActions) {
     if (!groups.has(semantic)) groups.set(semantic, []);
     groups.get(semantic).push(action);
   }
+  for (const actions of groups.values()) actions.sort((a, b) => concreteCost(adapter, a, playerIndex) - concreteCost(adapter, b, playerIndex));
   return groups;
 }
 
@@ -134,75 +165,62 @@ function visibleState(adapter, playerIndex, legalActions) {
   const self = adapter.engine.player(playerIndex);
   const opp = adapter.engine.player(adapter.engine.opponent(playerIndex));
   const battle = s.battle;
-  const groups = actionGroups(adapter, playerIndex, legalActions);
   return {
-    turn: s.turn,
+    turn: turnBucket(s.turn),
     phase: s.phase,
     active: s.activePlayer === playerIndex,
     priority: s.priorityPlayer === playerIndex,
     pending: s.pendingDecision?.type ?? null,
     battlePhaseEnded: Boolean(s.battlePhaseEnded),
-    chainPassCount: s.chainPassCount ?? 0,
     self: {
       character: self.character?.id ?? null,
-      deckCount: self.deck.length,
-      hand: canonicalCards(self.hand, s.turn),
-      field: canonicalCards(self.field, s.turn),
-      graveyard: canonicalCards(self.graveyard, s.turn),
-      summonedThisTurn: Boolean(self.summonedThisTurn),
-      specialUsed: Boolean(self.specialUsed),
+      deck: deckBucket(self.deck.length),
+      hand: handProfile(self.hand),
+      field: fieldProfile(self.field, s.turn),
+      grave: graveProfile(self.graveyard),
+      summoned: Boolean(self.summonedThisTurn),
+      special: Boolean(self.specialUsed),
     },
     opponent: {
       character: opp.character?.id ?? null,
-      deckCount: opp.deck.length,
-      handCount: opp.hand.length,
-      field: canonicalCards(opp.field, s.turn),
-      graveyard: canonicalCards(opp.graveyard, s.turn),
-      summonedThisTurn: Boolean(opp.summonedThisTurn),
-      specialUsed: Boolean(opp.specialUsed),
+      deck: deckBucket(opp.deck.length),
+      hand: handBucket(opp.hand.length),
+      field: fieldProfile(opp.field, s.turn),
+      grave: graveProfile(opp.graveyard),
+      special: Boolean(opp.specialUsed),
     },
     battle: battle ? {
-      attackerIsSelf: battle.attackerPlayer === playerIndex,
+      selfAttacking: battle.attackerPlayer === playerIndex,
       direct: Boolean(battle.direct),
-      attackerBase: battle.attackerBase,
-      defenderBase: battle.defenderBase,
-      attackerBonus: battle.attackerBonus,
-      defenderBonus: battle.defenderBonus,
-      selfDamagePrevented: Boolean(battle.damagePrevented?.[playerIndex]),
-      opponentDamagePrevented: Boolean(battle.damagePrevented?.[adapter.engine.opponent(playerIndex)]),
-      endBattlePhase: Boolean(battle.endBattlePhase),
+      attack: (battle.attackerBase ?? 0) + (battle.attackerBonus ?? 0),
+      defend: (battle.defenderBase ?? 0) + (battle.defenderBonus ?? 0),
+      selfPrevented: Boolean(battle.damagePrevented?.[playerIndex]),
+      opponentPrevented: Boolean(battle.damagePrevented?.[adapter.engine.opponent(playerIndex)]),
     } : null,
-    chain: s.chain.map(item => ({
-      self: item.player === playerIndex,
-      card: mechanicalCard(item.card, s.turn),
-    })),
-    legalActions: [...groups.keys()].sort(),
+    chain: s.chain.map(item => [item.player === playerIndex ? 1 : 0, item.card?.effect ?? null, item.card?.value ?? 0]),
+    legal: [...actionGroups(adapter, playerIndex, legalActions).keys()].sort(),
   };
 }
 
 export function informationKey(adapter, playerIndex = adapter.currentPlayer(), legalActions = adapter.legalActions(playerIndex)) {
-  return createHash('sha256')
-    .update(JSON.stringify(visibleState(adapter, playerIndex, legalActions)))
-    .digest('base64url');
+  return createHash('sha256').update(JSON.stringify(visibleState(adapter, playerIndex, legalActions))).digest('base64url');
 }
 
 export function visibleSummary(adapter, playerIndex = adapter.currentPlayer()) {
   const s = adapter.engine.state;
   const self = adapter.engine.player(playerIndex);
   const opp = adapter.engine.player(adapter.engine.opponent(playerIndex));
-  const short = card => card ? `${card.type}:${card.attack ?? card.effect ?? 0}${card.attackedTurn === s.turn ? '*' : ''}` : null;
   return {
-    turn: s.turn,
+    turnBucket: turnBucket(s.turn),
     phase: s.phase,
     character: self.character?.id ?? null,
-    active: s.activePlayer === playerIndex,
-    ownDeck: self.deck.length,
-    opponentDeck: opp.deck.length,
-    ownHand: self.hand.map(short).sort(),
-    ownField: self.field.filter(Boolean).map(short).sort(),
-    opponentField: opp.field.filter(Boolean).map(short).sort(),
-    ownGraveyard: self.graveyard.map(short).sort(),
-    opponentGraveyard: opp.graveyard.map(short).sort(),
+    ownDeckBucket: deckBucket(self.deck.length),
+    opponentDeckBucket: deckBucket(opp.deck.length),
+    ownHand: handProfile(self.hand),
+    ownField: fieldProfile(self.field, s.turn),
+    opponentField: fieldProfile(opp.field, s.turn),
+    ownGrave: graveProfile(self.graveyard),
+    opponentGrave: graveProfile(opp.graveyard),
     ownSpecialUsed: Boolean(self.specialUsed),
     opponentSpecialUsed: Boolean(opp.specialUsed),
     pending: s.pendingDecision?.type ?? null,
@@ -219,22 +237,18 @@ export function cloneAdapter(adapter) {
 
 export function createMatch(seed = 1, swapped = false) {
   const ids = swapped ? ['mami', 'madoka'] : ['madoka', 'mami'];
-  const rng = seededRng(seed);
   return new RLAdapter(new GameEngine({
     players: ids.map((id, index) => ({ id: `p${index}`, name: CHARACTERS[id].name, character: CHARACTERS[id] })),
     decks: ids.map(createDeck),
-    rng,
+    rng: seededRng(seed),
   }));
 }
 
 function normalize(weights, actions) {
-  let total = 0;
-  for (const action of actions) total += Math.max(0, weights.get(action) ?? 0);
-  if (total <= 0) {
-    const probability = 1 / actions.length;
-    return new Map(actions.map(action => [action, probability]));
-  }
-  return new Map(actions.map(action => [action, Math.max(0, weights.get(action) ?? 0) / total]));
+  const positive = actions.map(action => Math.max(0, weights.get(action) ?? 0));
+  const total = positive.reduce((sum, value) => sum + value, 0);
+  if (total <= 0) return new Map(actions.map(action => [action, 1 / actions.length]));
+  return new Map(actions.map((action, i) => [action, positive[i] / total]));
 }
 
 function sampleFrom(strategy, rng) {
@@ -259,7 +273,7 @@ function actionClass(descriptor) {
   if (descriptor.startsWith('summon:witch')) return 'summon-witch';
   if (descriptor.startsWith('attack:direct')) return 'attack-direct';
   if (descriptor.startsWith('attack:battle')) return 'attack-battle';
-  if (descriptor.startsWith('chain:shield')) return 'shield';
+  if (descriptor === 'chain:shield') return 'shield';
   if (descriptor.startsWith('chain:boost')) return 'boost';
   if (descriptor.startsWith('special:')) return 'special';
   if (descriptor.startsWith('revive:')) return 'revive';
@@ -283,26 +297,19 @@ function cutoffValue(adapter, perspective) {
   return Math.max(-0.95, Math.min(0.95, 0.72 * deck + 0.20 * board + 0.08 * hand));
 }
 
-function concreteForSemantic(groups, semantic, rng) {
+function concreteForSemantic(groups, semantic) {
   const options = groups.get(semantic) ?? [];
-  if (!options.length) throw new Error(`No concrete action for semantic action ${semantic}`);
-  return options[Math.floor(rng() * options.length)];
+  if (!options.length) throw new Error(`No concrete action for ${semantic}`);
+  return options[0];
 }
 
 function baselineSemantic(adapter, playerIndex, legalActions) {
   const chosen = chooseBaselineAction(adapter, playerIndex);
-  if (!legalActions.includes(chosen)) return null;
-  return actionDescriptor(adapter, chosen, playerIndex);
+  return legalActions.includes(chosen) ? actionDescriptor(adapter, chosen, playerIndex) : null;
 }
 
 export class RegretSolver {
-  constructor({
-    seed = 1,
-    exploration = 0.08,
-    rolloutsPerAction = 1,
-    maxActions = 260,
-    fallback = 'baseline',
-  } = {}) {
+  constructor({ seed = 1, exploration = 0.08, rolloutsPerAction = 1, maxActions = 260, fallback = 'baseline' } = {}) {
     this.seed = seed;
     this.exploration = exploration;
     this.rolloutsPerAction = rolloutsPerAction;
@@ -340,40 +347,27 @@ export class RegretSolver {
       if (average) {
         const total = [...node.strategySum.values()].reduce((sum, value) => sum + value, 0);
         if (total > 0) {
-          return {
-            key, node, groups, semantics,
-            strategy: new Map(semantics.map(action => [action, (node.strategySum.get(action) ?? 0) / total])),
-            fallback: false,
-          };
+          return { key, groups, semantics, fallback: false, strategy: new Map(semantics.map(action => [action, (node.strategySum.get(action) ?? 0) / total])) };
         }
       }
-      return { key, node, groups, semantics, strategy: normalize(node.regrets, semantics), fallback: false };
+      return { key, groups, semantics, fallback: false, strategy: normalize(node.regrets, semantics) };
     }
-
     if (this.fallback === 'baseline') {
-      const semantic = baselineSemantic(adapter, playerIndex, legalActions);
-      if (semantic && groups.has(semantic)) {
-        return {
-          key, node: null, groups, semantics,
-          strategy: new Map(semantics.map(action => [action, action === semantic ? 1 : 0])),
-          fallback: true,
-        };
+      const prior = baselineSemantic(adapter, playerIndex, legalActions);
+      if (prior && groups.has(prior)) {
+        return { key, groups, semantics, fallback: true, strategy: new Map(semantics.map(action => [action, action === prior ? 1 : 0])) };
       }
     }
-    return { key, node: null, groups, semantics, strategy: normalize(new Map(), semantics), fallback: true };
+    return { key, groups, semantics, fallback: true, strategy: normalize(new Map(), semantics) };
   }
 
   choose(adapter, playerIndex, rng, { average = false, exploration = 0 } = {}) {
-    const legalActions = adapter.legalActions(playerIndex);
-    if (!legalActions.length) throw new Error(`No legal actions for player ${playerIndex}`);
-    if (legalActions.length === 1) return { action: legalActions[0], semantic: actionDescriptor(adapter, legalActions[0], playerIndex), fallback: false };
-    const bundle = this.strategyBundle(adapter, playerIndex, legalActions, { average });
+    const legal = adapter.legalActions(playerIndex);
+    if (!legal.length) throw new Error(`No legal actions for player ${playerIndex}`);
+    if (legal.length === 1) return { action: legal[0], semantic: actionDescriptor(adapter, legal[0], playerIndex), fallback: false };
+    const bundle = this.strategyBundle(adapter, playerIndex, legal, { average });
     const semantic = sampleFrom(mixUniform(bundle.strategy, exploration), rng);
-    return {
-      action: concreteForSemantic(bundle.groups, semantic, rng),
-      semantic,
-      fallback: bundle.fallback,
-    };
+    return { action: concreteForSemantic(bundle.groups, semantic), semantic, fallback: bundle.fallback };
   }
 
   rollout(adapter, perspective, rng) {
@@ -383,10 +377,8 @@ export class RegretSolver {
       const player = adapter.currentPlayer();
       const legal = adapter.legalActions(player);
       if (!legal.length) return cutoffValue(adapter, perspective);
-      const chosen = legal.length === 1
-        ? legal[0]
-        : this.choose(adapter, player, rng, { average: false }).action;
-      adapter.applyAction(chosen, player);
+      const action = legal.length === 1 ? legal[0] : this.choose(adapter, player, rng).action;
+      adapter.applyAction(action, player);
     }
     this.training.cutoffs += 1;
     return cutoffValue(adapter, perspective);
@@ -398,8 +390,7 @@ export class RegretSolver {
       let total = 0;
       for (let rollout = 0; rollout < this.rolloutsPerAction; rollout++) {
         const child = cloneAdapter(adapter);
-        const concrete = concreteForSemantic(groups, semantic, rng);
-        child.applyAction(concrete, playerIndex);
+        child.applyAction(concreteForSemantic(groups, semantic), playerIndex);
         total += this.rollout(child, playerIndex, rng);
       }
       values.set(semantic, total / this.rolloutsPerAction);
@@ -420,7 +411,6 @@ export class RegretSolver {
           adapter.applyAction(legal[0], player);
           continue;
         }
-
         const { node, groups, semantics } = this.ensureNode(adapter, player, legal);
         const strategy = normalize(node.regrets, semantics);
         const values = this.evaluateSemanticActions(adapter, player, groups, semantics, rng);
@@ -431,18 +421,13 @@ export class RegretSolver {
         }
         node.visits += 1;
         this.training.decisions += 1;
-
         const semantic = sampleFrom(mixUniform(strategy, this.exploration), rng);
-        adapter.applyAction(concreteForSemantic(groups, semantic, rng), player);
+        adapter.applyAction(concreteForSemantic(groups, semantic), player);
       }
-
       const winner = adapter.engine.state.winner;
       if (winner === null || winner === undefined) this.training.draws += 1;
-      else {
-        const character = adapter.engine.player(winner).character?.id;
-        if (character === 'madoka') this.training.madokaWins += 1;
-        else if (character === 'mami') this.training.mamiWins += 1;
-      }
+      else if (adapter.engine.player(winner).character?.id === 'madoka') this.training.madokaWins += 1;
+      else this.training.mamiWins += 1;
       this.training.games += 1;
     }
     return this.training;
@@ -454,17 +439,15 @@ export class RegretSolver {
     const actionCounts = {};
     let solverDecisions = 0;
     let fallbackDecisions = 0;
-
     for (let actions = 0; actions < this.maxActions; actions++) {
       if (adapter.engine.state.phase === PHASES.GAME_OVER) break;
       const player = adapter.currentPlayer();
       const legal = adapter.legalActions(player);
       if (!legal.length) break;
       const character = adapter.engine.player(player).character?.id;
-      const useSolver = !baselineOpponent || character === solverCharacter;
       let action;
       let semantic;
-      if (!useSolver) {
+      if (baselineOpponent && character !== solverCharacter) {
         action = chooseBaselineAction(adapter, player);
         semantic = actionDescriptor(adapter, action, player);
       } else if (legal.length === 1) {
@@ -481,12 +464,10 @@ export class RegretSolver {
       }
       adapter.applyAction(action, player);
     }
-
+    const winner = adapter.engine.state.winner;
     return {
-      winner: adapter.engine.state.winner,
-      winnerCharacter: adapter.engine.state.winner === null || adapter.engine.state.winner === undefined
-        ? null
-        : adapter.engine.player(adapter.engine.state.winner).character?.id,
+      winner,
+      winnerCharacter: winner === null || winner === undefined ? null : adapter.engine.player(winner).character?.id,
       terminated: adapter.engine.state.phase === PHASES.GAME_OVER,
       turn: adapter.engine.state.turn,
       solverDecisions,
@@ -496,38 +477,21 @@ export class RegretSolver {
   }
 
   evaluateVsBaseline(character, { games = 100, seed = this.seed + 900000 } = {}) {
-    const totals = {
-      character,
-      games,
-      wins: 0,
-      losses: 0,
-      draws: 0,
-      terminated: 0,
-      solverDecisions: 0,
-      fallbackDecisions: 0,
-      actionCounts: {},
-    };
+    const totals = { character, games, wins: 0, losses: 0, draws: 0, terminated: 0, solverDecisions: 0, fallbackDecisions: 0, actionCounts: {} };
     for (let game = 0; game < games; game++) {
       const swapped = character === 'madoka' ? game % 2 === 1 : game % 2 === 0;
-      const result = this.playPolicyGame({
-        seed: seed + game * 65537,
-        swapped,
-        solverCharacter: character,
-        average: true,
-        baselineOpponent: true,
-      });
+      const result = this.playPolicyGame({ seed: seed + game * 65537, swapped, solverCharacter: character, average: true, baselineOpponent: true });
       if (result.terminated) totals.terminated += 1;
       if (result.winnerCharacter === character) totals.wins += 1;
       else if (result.winnerCharacter === null) totals.draws += 1;
       else totals.losses += 1;
       totals.solverDecisions += result.solverDecisions;
       totals.fallbackDecisions += result.fallbackDecisions;
-      for (const [key, value] of Object.entries(result.actionCounts)) {
-        totals.actionCounts[key] = (totals.actionCounts[key] ?? 0) + value;
-      }
+      for (const [key, value] of Object.entries(result.actionCounts)) totals.actionCounts[key] = (totals.actionCounts[key] ?? 0) + value;
     }
     totals.winRate = totals.wins / games;
     totals.fallbackRate = totals.solverDecisions ? totals.fallbackDecisions / totals.solverDecisions : 0;
+    totals.coverage = 1 - totals.fallbackRate;
     return totals;
   }
 
@@ -537,40 +501,33 @@ export class RegretSolver {
       .slice(0, limit)
       .map(node => {
         const total = [...node.strategySum.values()].reduce((sum, value) => sum + value, 0);
-        const strategy = [...node.regrets.keys()].map(action => ({
-          action,
-          label: action,
-          probability: total > 0 ? (node.strategySum.get(action) ?? 0) / total : 0,
-          regret: node.regrets.get(action) ?? 0,
-        })).sort((a, b) => b.probability - a.probability || b.regret - a.regret);
         return {
           key: node.key,
           character: node.character,
           visits: node.visits,
           summary: node.summary,
-          strategy,
+          strategy: [...node.regrets.keys()].map(action => ({
+            action,
+            label: action,
+            probability: total > 0 ? (node.strategySum.get(action) ?? 0) / total : 0,
+            regret: node.regrets.get(action) ?? 0,
+          })).sort((a, b) => b.probability - a.probability || b.regret - a.regret),
         };
       });
   }
 
   report({ evaluationGames = 100, top = 30 } = {}) {
+    const madoka = this.evaluateVsBaseline('madoka', { games: evaluationGames });
+    const mami = this.evaluateVsBaseline('mami', { games: evaluationGames, seed: this.seed + 1900000 });
     return {
       format: SOLVER_FORMAT,
       algorithm: SOLVER_ALGORITHM,
       exactNash: false,
-      approximation: 'Mechanical card-equivalence information sets plus Monte Carlo continuation regret matching. Opponent hand identities and both deck orders are excluded; hand/field/grave order and duplicate card artwork identity are abstracted away.',
-      config: {
-        seed: this.seed,
-        exploration: this.exploration,
-        rolloutsPerAction: this.rolloutsPerAction,
-        maxActions: this.maxActions,
-        fallback: this.fallback,
-      },
+      approximation: 'Bucketed strategic information sets with Monte Carlo continuation regret matching. Hidden opponent hand identities and deck orders are excluded. Exact card artwork identity, zone order, exact turn, and exact deck counts are abstracted for tractability.',
+      config: { seed: this.seed, exploration: this.exploration, rolloutsPerAction: this.rolloutsPerAction, maxActions: this.maxActions, fallback: this.fallback },
       training: { ...this.training, informationSets: this.nodes.size },
-      evaluation: {
-        madokaVsBaselineMami: this.evaluateVsBaseline('madoka', { games: evaluationGames }),
-        mamiVsBaselineMadoka: this.evaluateVsBaseline('mami', { games: evaluationGames, seed: this.seed + 1900000 }),
-      },
+      evaluation: { madokaVsBaselineMami: madoka, mamiVsBaselineMadoka: mami },
+      coverageGate: { threshold: 0.5, passed: madoka.coverage >= 0.5 && mami.coverage >= 0.5 },
       topInformationSets: this.topInformationSets(top),
     };
   }
