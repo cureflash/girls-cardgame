@@ -1,4 +1,4 @@
-import { GameEngine, CARD_TYPES, PHASES } from './game-engine.js?v=handtribute1';
+import { GameEngine, CARD_TYPES, PHASES } from './game-engine.js?v=shield2';
 import { CHARACTERS, createDeck } from './card-data.js';
 import { RLAdapter } from './rl-adapter.js';
 import { chooseBaselineAction } from './baseline-ai.js';
@@ -14,7 +14,7 @@ function description(card) {
   if (card.type === CARD_TYPES.FAMILIAR) return `攻撃力 ${card.attack}。生贄なしで召喚できます。`;
   if (card.effect === 'draw') return 'メインフェイズに2枚ドロー。山札が0枚になると敗北します。';
   if (card.effect === 'boost') return `戦闘中の自分の使い魔・魔女の攻撃力を＋${card.value}。この戦闘のみ有効。`;
-  return 'この戦闘で自分の使い魔は戦闘では破壊されません。発動した時点でチェーンを終了します。戦闘ダメージは通常通り受けます。';
+  return 'この戦闘で自分の使い魔は戦闘では破壊されず、自分が受ける戦闘ダメージは0になります。発動した時点でチェーンを終了し、この戦闘の解決後にバトルフェイズを終了します。';
 }
 function clear() { selection = null; tributes = []; attacker = null; target = null; }
 function humanTurn() { return mode === 'local' || adapter.currentPlayer() === human; }
@@ -193,12 +193,16 @@ function renderActions() {
       root.append(button(self.character.special, () => perform(() => engine.activateSpecial(p)), 'special', !engine.canUseSpecial(p)), button('バトル開始', () => perform(() => engine.continueBattlePhase(p))));
     }
     if (s.phase === PHASES.BATTLE) {
-      hint = s.turn === 1 ? '先攻の初ターンは攻撃できません。ターンを終了してください。' : '攻撃可能な自分のカードを選んでください。';
-      if (attacker) {
-        hint = target === null ? '相手のカードを選ぶか、相手の場が空なら直接攻撃できます。' : `${engine.player(1 - p).field[target].name}に攻撃します。`;
-        if (engine.canAttack(p, attacker.slot, null)) root.append(button('直接攻撃する', () => perform(() => engine.attack(p, attacker.slot, null))));
-        else root.append(button('攻撃する', () => perform(() => engine.attack(p, attacker.slot, target)), 'primary', target === null));
-        root.append(button('選択を解除', () => { clear(); render(); }, 'quiet'));
+      if (s.battlePhaseEnded) {
+        hint = '盾の効果でバトルフェイズは終了しました。ターンを終了してください。';
+      } else {
+        hint = s.turn === 1 ? '先攻の初ターンは攻撃できません。ターンを終了してください。' : '攻撃可能な自分のカードを選んでください。';
+        if (attacker) {
+          hint = target === null ? '相手のカードを選ぶか、相手の場が空なら直接攻撃できます。' : `${engine.player(1 - p).field[target].name}に攻撃します。`;
+          if (engine.canAttack(p, attacker.slot, null)) root.append(button('直接攻撃する', () => perform(() => engine.attack(p, attacker.slot, null))));
+          else root.append(button('攻撃する', () => perform(() => engine.attack(p, attacker.slot, target)), 'primary', target === null));
+          root.append(button('選択を解除', () => { clear(); render(); }, 'quiet'));
+        }
       }
     }
     if (engine.canEndTurn(p)) root.append(button('ターン終了', () => perform(() => engine.endTurn(p)), 'quiet'));
