@@ -16,7 +16,7 @@ jobs:
       - name: Browser app syntax
         run: node --check src/app.js
       - name: Core regression tests
-        run: node --test tests/engine.test.mjs tests/hand-tributes.test.mjs tests/rl-adapter.test.mjs tests/evaluation-ai.test.mjs tests/genetics.test.mjs tests/character-ai.test.mjs tests/duel-log.test.mjs tests/cfr.test.mjs
+        run: node --test tests/engine.test.mjs tests/hand-tributes.test.mjs tests/rl-adapter.test.mjs tests/evaluation-ai.test.mjs tests/genetics.test.mjs tests/character-ai.test.mjs tests/duel-log.test.mjs tests/cfr.test.mjs tests/best-response.test.mjs
       - name: WebP card assets
         run: node --test --test-name-pattern='all gameplay card art uses non-placeholder WebP assets' tests/integration.test.mjs
       - name: 300-duel regression
@@ -37,4 +37,14 @@ jobs:
         with:
           name: cfr-strategy-report
           path: /tmp/cfr-strategy.json
+          retention-days: 7
+      - name: Rollout best-response analysis
+        if: contains(github.event.head_commit.message, '[solve-best-response]')
+        run: npm run br:solve -- --character madoka --games 24 --samples 6 --max-actions 220 --output /tmp/best-response.json
+      - name: Upload best-response report
+        if: contains(github.event.head_commit.message, '[solve-best-response]')
+        uses: actions/upload-artifact@v4
+        with:
+          name: best-response-report
+          path: /tmp/best-response.json
           retention-days: 7
