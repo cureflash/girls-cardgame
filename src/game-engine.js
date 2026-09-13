@@ -25,6 +25,7 @@ export class GameEngine {
       chainPassCount: 0,
       resumePhase: null,
       battle: null,
+      battlePhaseEnded: false,
       logs: [],
       events: [],
       winner: null,
@@ -265,6 +266,7 @@ export class GameEngine {
   enterBattlePhase(playerIndex) {
     this.ensurePriority(playerIndex);
     if (!this.canEnterBattlePhase(playerIndex)) throw new Error('Battle phase cannot be entered now.');
+    this.state.battlePhaseEnded = false;
     this.setPhase(PHASES.BATTLE_START);
     this.state.priorityPlayer = playerIndex;
     this.log(`${this.player(playerIndex).name}がバトルフェイズ開始時へ`);
@@ -281,6 +283,7 @@ export class GameEngine {
   continueBattlePhase(playerIndex) {
     this.ensurePriority(playerIndex);
     if (!this.canContinueBattlePhase(playerIndex)) throw new Error('Battle phase cannot continue now.');
+    this.state.battlePhaseEnded = false;
     this.setPhase(PHASES.BATTLE);
     this.state.priorityPlayer = playerIndex;
     this.log(`${this.player(playerIndex).name}のバトルフェイズ`);
@@ -288,7 +291,7 @@ export class GameEngine {
   }
 
   canAttack(playerIndex, attackerSlot, targetSlot = null) {
-    if (this.state.phase !== PHASES.BATTLE || this.state.pendingDecision) return false;
+    if (this.state.phase !== PHASES.BATTLE || this.state.pendingDecision || this.state.battlePhaseEnded) return false;
     if (this.state.activePlayer !== playerIndex || this.state.priorityPlayer !== playerIndex) return false;
     if (this.state.turn === 1) return false;
     if (!Number.isInteger(attackerSlot) || attackerSlot < 0 || attackerSlot >= 5) return false;
@@ -312,6 +315,7 @@ export class GameEngine {
       attackerBase: attacker.attack ?? 0, defenderBase: defender?.attack ?? 0,
       attackerBonus: 0, defenderBonus: 0,
       damagePrevented: [false, false],
+      endBattlePhase: false,
     };
     this.state.resumePhase = PHASES.BATTLE;
     this.log(`${attacker.name}が${defender ? defender.name + 'を攻撃' : '直接攻撃'}`);
@@ -411,6 +415,7 @@ export class GameEngine {
       else if (playerIndex === battle.defenderPlayer) battle.defenderBonus += card.value ?? 0;
     } else if (card.effect === 'nullifyDamage') {
       battle.damagePrevented[playerIndex] = true;
+      battle.endBattlePhase = true;
     }
     this.player(playerIndex).graveyard.push(card);
     this.emit('magic', { player: playerIndex, card: { ...card } });
@@ -434,18 +439,21 @@ export class GameEngine {
       const loserSlot = attackValue > defendValue ? b.defenderSlot : b.attackerSlot;
       const rawDamage = b.direct ? attackValue : Math.abs(attackValue - defendValue);
       if (!b.direct && !shieldProtects(loserPlayer, loserSlot)) this.destroy(loserPlayer, loserSlot, 'battle');
-      const damage = this.applyCharacterDamageReduction(loserPlayer, rawDamage);
+      const damage = b.damagePrevented[loserPlayer] ? 0 : this.applyCharacterDamageReduction(loserPlayer, rawDamage);
       this.log(`${this.player(loserPlayer).name}に${b.direct ? '直接攻撃' : '戦闘'}ダメージ ${damage}`);
       this.emit('damage', { player: loserPlayer, amount: damage, rawAmount: rawDamage, direct: b.direct });
       if (damage > 0) this.takeDeckDamage(loserPlayer, damage);
     }
     this.emit('battleEnd', { ...structuredClone(b), attackValue, defendValue });
+    const battlePhaseEnded = !!b.endBattlePhase;
     this.state.battle = null;
     this.state.chainPassCount = 0;
     this.state.resumePhase = null;
     if (this.state.phase !== PHASES.GAME_OVER) {
       this.setPhase(PHASES.BATTLE);
+      this.state.battlePhaseEnded = battlePhaseEnded;
       this.state.priorityPlayer = this.state.activePlayer;
+      if (battlePhaseEnded) this.log('盾の効果でバトルフェイズ終了');
       this.openPriorityWindow();
     }
   }
@@ -546,6 +554,7 @@ export class GameEngine {
     this.state.chain = [];
     this.state.chainPassCount = 0;
     this.state.battle = null;
+    this.state.battlePhaseEnded = false;
     this.state.resumePhase = null;
     this.state.turn += 1;
     this.state.activePlayer = this.opponent(playerIndex);
