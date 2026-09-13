@@ -1,11 +1,12 @@
 import { GameEngine, CARD_TYPES, PHASES } from './game-engine.js?v=shield2';
 import { CHARACTERS, createDeck } from './card-data.js';
-import { RLAdapter } from './rl-adapter.js';
+import { RLAdapter, RULES_VERSION } from './rl-adapter.js';
 import { chooseBaselineAction } from './baseline-ai.js';
 import { Policy } from './policy.js';
+import { buildDuelLog, captureDuelState, createDuelTrace, recordDuelStep } from './duel-log.js?v=duel-log1';
 
 const $ = selector => document.querySelector(selector);
-let engine, adapter, human = 0, mode = 'cpu', policy = null, timer, generation = 0, eventCursor = 0;
+let engine, adapter, duelTrace, human = 0, mode = 'cpu', policy = null, timer, generation = 0, eventCursor = 0;
 let selection = null, tributes = [], attacker = null, target = null;
 const node = (tag, className, text) => { const el = document.createElement(tag); el.className = className; if (text !== undefined) el.textContent = text; return el; };
 const typeName = card => ({ familiar: '使い魔', witch: '魔女', magic: '魔法' })[card.type];
@@ -19,6 +20,11 @@ function description(card) {
 function clear() { selection = null; tributes = []; attacker = null; target = null; }
 function humanTurn() { return mode === 'local' || adapter.currentPlayer() === human; }
 function notify(text = '') { $('#notice').textContent = text; $('#notice').hidden = !text; }
+function controllerFor(playerIndex) {
+  if (mode === 'local') return `local-player-${playerIndex + 1}`;
+  if (playerIndex === human) return 'human';
+  return policy ? 'trained-ai' : 'baseline-ai';
+}
 function showDetail(card) {
   const root = $('#card-detail');
   root.replaceChildren();
@@ -33,12 +39,46 @@ function start() {
   const ids = human === 0 ? [chosen, chosen === 'madoka' ? 'mami' : 'madoka'] : [chosen === 'madoka' ? 'mami' : 'madoka', chosen];
   engine = new GameEngine({ players: ids.map((id, i) => ({ id: `p${i}`, name: CHARACTERS[id].name, character: CHARACTERS[id] })), decks: ids.map(createDeck) });
   adapter = new RLAdapter(engine);
+  duelTrace = createDuelTrace({ engine, mode, humanSeat: human, rulesVersion: RULES_VERSION, ai: policy ? 'trained-ai' : 'baseline-ai' });
   $('#card-detail').replaceChildren(node('p', 'muted', 'カードに触れると、ここに詳細を表示します。'), node('div', 'detail-placeholder', '✦'));
   finishAction();
 }
-function perform(fn) {
-  try { notify(); fn(); clear(); finishAction(); }
-  catch (error) { notify(error.message); render(); }
+function perform(fn, action = null) {
+  const actor = adapter.currentPlayer();
+  const before = captureDuelState(engine);
+  const legalActions = adapter.legalActions(actor);
+  const eventStart = engine.state.events.length;
+  const defaultController = controllerFor(actor);
+  try {
+    notify();
+    const result = fn();
+    clear();
+    finishAction();
+    recordDuelStep(duelTrace, {
+      engine,
+      actor,
+      controller: result?.controller ?? defaultController,
+      action: result?.action ?? action,
+      legalActions,
+      eventStart,
+      before,
+    });
+  } catch (error) { notify(error.message); render(); }
+}
+function downloadDuelLog() {
+  const payload = buildDuelLog(duelTrace, engine);
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  const matchup = engine.state.players.map(player => player.character.id).join('-vs-');
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  link.href = url;
+  link.download = `duel-${matchup}-${stamp}.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+  notify('解析用の対戦ログを保存しました。');
 }
 function finishAction() {
   const s = engine.state;
@@ -56,10 +96,11 @@ function scheduleAI() {
     if (duel !== generation) return;
     perform(() => {
       const player = adapter.currentPlayer(), legal = adapter.legalActions(player);
-      let action;
+      let action, controller = policy ? 'trained-ai' : 'baseline-ai';
       try { action = policy ? policy.choose(adapter.observation(player), legal) : chooseBaselineAction(adapter, player); }
-      catch (error) { policy = null; $('#ai-name').textContent = '基本AI'; notify(`${error.message} 基本AIで続けます。`); action = chooseBaselineAction(adapter, player); }
+      catch (error) { policy = null; controller = 'baseline-ai'; $('#ai-name').textContent = '基本AI'; notify(`${error.message} 基本AIで続けます。`); action = chooseBaselineAction(adapter, player); }
       adapter.applyAction(action, player);
+      return { action: { type: 'rl-action', actionId: action }, controller };
     });
   }, 450);
 }
@@ -181,16 +222,25 @@ function renderActions() {
             hint = `生贄を場・手札から選択：合計 ${total} / 必要 ${card.tributeThreshold} 以上。手札からは使い魔だけ選べます。`;
           }
           const tributeReady = card.type !== CARD_TYPES.WITCH || (total >= card.tributeThreshold && createsSpace);
-          root.append(button(card.type === CARD_TYPES.WITCH ? '生贄を捧げて召喚' : '召喚する', () => perform(() => engine.summon(p, card.id, tributes)), 'primary', !engine.canSummon(p, card.id) || !tributeReady));
-        } else if (card.effect === 'draw') root.append(button('魔法を発動', () => perform(() => engine.activateMainMagic(p, card.id)), 'primary', !engine.canActivateMainMagic(p, card.id)));
+          root.append(button(card.type === CARD_TYPES.WITCH ? '生贄を捧げて召喚' : '召喚する', () => perform(
+            () => engine.summon(p, card.id, tributes),
+            { type: 'summon', cardId: card.id, cardName: card.name, tributes: structuredClone(tributes) },
+          ), 'primary', !engine.canSummon(p, card.id) || !tributeReady));
+        } else if (card.effect === 'draw') root.append(button('魔法を発動', () => perform(
+          () => engine.activateMainMagic(p, card.id),
+          { type: 'main-magic', cardId: card.id, cardName: card.name },
+        ), 'primary', !engine.canActivateMainMagic(p, card.id)));
         root.append(button('選択を解除', () => { clear(); render(); }, 'quiet'));
       }
-      root.append(button('バトルフェイズへ', () => perform(() => engine.enterBattlePhase(p)), 'secondary'));
+      root.append(button('バトルフェイズへ', () => perform(() => engine.enterBattlePhase(p), { type: 'enter-battle' }), 'secondary'));
     }
     if (s.phase === PHASES.BATTLE_START) {
       const self = engine.player(p);
       hint = self.specialUsed ? '必殺技は使用済みです。バトルを始めましょう。' : '必殺技を使うと、このターンのバトルはスキップします。';
-      root.append(button(self.character.special, () => perform(() => engine.activateSpecial(p)), 'special', !engine.canUseSpecial(p)), button('バトル開始', () => perform(() => engine.continueBattlePhase(p))));
+      root.append(
+        button(self.character.special, () => perform(() => engine.activateSpecial(p), { type: 'special', name: self.character.special }), 'special', !engine.canUseSpecial(p)),
+        button('バトル開始', () => perform(() => engine.continueBattlePhase(p), { type: 'continue-battle' })),
+      );
     }
     if (s.phase === PHASES.BATTLE) {
       if (s.battlePhaseEnded) {
@@ -199,13 +249,20 @@ function renderActions() {
         hint = s.turn === 1 ? '先攻の初ターンは攻撃できません。ターンを終了してください。' : '攻撃可能な自分のカードを選んでください。';
         if (attacker) {
           hint = target === null ? '相手のカードを選ぶか、相手の場が空なら直接攻撃できます。' : `${engine.player(1 - p).field[target].name}に攻撃します。`;
-          if (engine.canAttack(p, attacker.slot, null)) root.append(button('直接攻撃する', () => perform(() => engine.attack(p, attacker.slot, null))));
-          else root.append(button('攻撃する', () => perform(() => engine.attack(p, attacker.slot, target)), 'primary', target === null));
+          const attackerCard = engine.player(p).field[attacker.slot];
+          if (engine.canAttack(p, attacker.slot, null)) root.append(button('直接攻撃する', () => perform(
+            () => engine.attack(p, attacker.slot, null),
+            { type: 'attack', attackerSlot: attacker.slot, attackerId: attackerCard?.id ?? null, targetSlot: null },
+          )));
+          else root.append(button('攻撃する', () => perform(
+            () => engine.attack(p, attacker.slot, target),
+            { type: 'attack', attackerSlot: attacker.slot, attackerId: attackerCard?.id ?? null, targetSlot: target, targetId: engine.player(1 - p).field[target]?.id ?? null },
+          ), 'primary', target === null));
           root.append(button('選択を解除', () => { clear(); render(); }, 'quiet'));
         }
       }
     }
-    if (engine.canEndTurn(p)) root.append(button('ターン終了', () => perform(() => engine.endTurn(p)), 'quiet'));
+    if (engine.canEndTurn(p)) root.append(button('ターン終了', () => perform(() => engine.endTurn(p), { type: 'end-turn' }), 'quiet'));
   }
   $('#hint').textContent = hint;
 }
@@ -238,11 +295,14 @@ function renderDecision() {
   for (const id of d.options) {
     const card = (d.type === 'CHAIN_RESPONSE' ? p.hand : p.graveyard).find(c => c.id === id);
     const b = cardButton(card, d.player, 'choice');
-    b.onclick = () => perform(() => d.type === 'CHAIN_RESPONSE' ? engine.respondChain(d.player, id) : engine.selectReviveTarget(d.player, id));
+    const action = d.type === 'CHAIN_RESPONSE'
+      ? { type: 'chain-response', cardId: id, cardName: card.name }
+      : { type: 'revive', cardId: id, cardName: card.name };
+    b.onclick = () => perform(() => d.type === 'CHAIN_RESPONSE' ? engine.respondChain(d.player, id) : engine.selectReviveTarget(d.player, id), action);
     list.append(b);
   }
   root.append(list);
-  if (d.type === 'CHAIN_RESPONSE') root.append(button('発動しない', () => perform(() => engine.respondChain(d.player)), 'secondary'));
+  if (d.type === 'CHAIN_RESPONSE') root.append(button('発動しない', () => perform(() => engine.respondChain(d.player), { type: 'chain-pass' }), 'secondary'));
   if (!dialog.open) dialog.showModal();
 }
 function showGrave(index) {
@@ -256,6 +316,7 @@ function showGrave(index) {
 }
 $('#decision').addEventListener('cancel', e => { if (engine.state.pendingDecision) e.preventDefault(); });
 $('#new-game').onclick = () => { if (engine.state.phase === PHASES.GAME_OVER) start(); else $('#restart').showModal(); };
+$('#export-log').onclick = downloadDuelLog;
 $('#cancel-restart').onclick = () => $('#restart').close();
 $('#confirm-restart').onclick = () => { $('#restart').close(); start(); };
 $('#policy-file').onchange = async event => {
