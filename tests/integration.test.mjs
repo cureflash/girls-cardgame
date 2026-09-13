@@ -8,13 +8,15 @@ import { chooseBaselineAction } from '../src/baseline-ai.js';
 
 function rngFor(seed) { return () => { seed = (Math.imul(seed,1664525)+1013904223)>>>0; return seed/4294967296; }; }
 
-test('both decks share 12/7/11 composition, one draw, and their own 13 witch; all images exist', () => {
+test('both decks share 13/7/10 composition, no draw spell, and their own 13 witch; all images exist', () => {
   const decks=['madoka','mami'].map(createDeck);
   for (const deck of decks) {
     assert.equal(deck.length,30); assert.equal(new Set(deck.map(c=>c.id)).size,30);
-    assert.equal(deck.filter(c=>c.type==='familiar').length,12);
+    assert.equal(deck.filter(c=>c.type==='familiar').length,13);
     assert.equal(deck.filter(c=>c.type==='witch').length,7);
-    assert.equal(deck.filter(c=>c.effect==='draw').length,1);
+    assert.equal(deck.filter(c=>c.type==='magic').length,10);
+    assert.equal(deck.filter(c=>c.effect==='draw').length,0);
+    assert.equal(deck.filter(c=>c.type==='familiar'&&c.attack===3).length,5);
     assert.equal(deck.filter(c=>c.attack===13).length,1);
     for(const card of deck) assert.ok(existsSync(new URL('../'+card.image.split('?')[0],import.meta.url)),card.image);
   }
@@ -44,7 +46,7 @@ function assertWebP(file) {
 
 test('all gameplay card art uses non-placeholder WebP assets', () => {
   const files=[...new Set(['madoka','mami'].flatMap(id=>createDeck(id).map(c=>c.image.split('?')[0])))];
-  assert.equal(files.length,27);
+  assert.equal(files.length,26);
   for(const file of files) assertWebP(file);
 
   const mamiMonsters=createDeck('mami').filter(c=>c.type!=='magic');
