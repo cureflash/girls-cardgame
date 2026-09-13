@@ -7,6 +7,7 @@
     "rl:random": "node rl/random-baseline.mjs",
     "ga:evolve": "node ga/evolve.mjs",
     "ga:evaluate": "node ga/evaluate.mjs",
-    "ga:publish": "node ga/publish.mjs"
+    "ga:publish": "node ga/publish.mjs",
+    "cfr:solve": "node cfr/run.mjs"
   }
 }
