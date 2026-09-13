@@ -3,8 +3,12 @@ import assert from 'node:assert/strict';
 import {
   candidateActions,
   determinizeForPlayer,
-  evaluateBestResponse,
 } from '../br/rollout-best-response.mjs';
+import {
+  evaluateBestResponseV2,
+  evaluateDecisionV2,
+} from '../br/rollout-best-response-v2.mjs';
+import { chooseBaselineAction } from '../src/baseline-ai.js';
 import { createMatch, seededRng } from '../cfr/solver.mjs';
 
 test('determinization preserves own hand and public zones while resampling hidden zones', () => {
@@ -41,16 +45,36 @@ test('strategic candidate reduction keeps only legal concrete actions', () => {
   assert.equal(new Set(candidates.map(candidate => candidate.action)).size, candidates.length);
 });
 
-test('rollout best response completes a short real-game evaluation', () => {
-  const result = evaluateBestResponse({
+test('conservative planner retains baseline and can refuse noisy deviations', () => {
+  const adapter = createMatch(2026, false);
+  const player = adapter.currentPlayer();
+  const legal = adapter.legalActions(player);
+  assert.ok(legal.length > 1);
+  const baseline = chooseBaselineAction(adapter, player);
+  const result = evaluateDecisionV2(adapter, player, {
+    samples: 2,
+    seed: 17,
+    maxActions: 160,
+    minGain: 1,
+  });
+  assert.equal(result.baselineAction, baseline);
+  assert.equal(result.action, baseline);
+  assert.equal(result.deviated, false);
+  assert.ok(result.candidates.some(candidate => candidate.action === baseline));
+});
+
+test('conservative rollout best response completes a short real-game evaluation', () => {
+  const result = evaluateBestResponseV2({
     character: 'madoka',
     games: 2,
     samples: 2,
     seed: 555,
     maxActions: 160,
+    minGain: 0.1,
   });
   assert.equal(result.games, 2);
   assert.equal(result.wins + result.losses + result.draws, 2);
   assert.ok(result.plannerDecisions > 0);
   assert.ok(Number.isFinite(result.winRate));
+  assert.ok(result.deviations <= result.plannerDecisions);
 });
