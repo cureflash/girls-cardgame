@@ -9,3 +9,5 @@ The current v2 planner always retains the baseline AI's exact concrete action as
 This does not claim an exact Nash equilibrium. It is an online hidden-information Monte Carlo rollout policy against a fixed opponent, intended to answer the practical question: **what should this player do to maximize win probability against the current baseline AI?**
 
 The report always includes a baseline-vs-baseline control using the same game seeds so the observed win-rate lift can be compared directly.
+
+The baseline evaluation projection is required to match current shield semantics: a shield protects a participating familiar **or witch** from destruction and ends the battle phase.
