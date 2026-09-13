@@ -6,14 +6,14 @@ export const CHARACTERS = {
     name: '鹿目まどか',
     passive: '受ける戦闘ダメージを常に1軽減',
     special: 'プルウィア☆マギカ',
-    image: './assets/characters/madoka.png',
+    image: './assets/characters/madoka.webp',
   },
   mami: {
     id: 'mami',
     name: '巴マミ',
     passive: '初期手札+1枚',
     special: 'ティロ・フィナーレ',
-    image: './assets/characters/mami.png',
+    image: './assets/characters/mami.webp',
   },
 };
 
