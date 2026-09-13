@@ -28,3 +28,13 @@ jobs:
           test -f /tmp/ga-smoke/latest-mami.json
           test -f /tmp/ga-smoke/latest.json
           npm run ga:evaluate -- /tmp/ga-smoke/latest.json --games 8 --seed 99
+      - name: Approximate equilibrium solve
+        if: contains(github.event.head_commit.message, '[solve-strategy]')
+        run: npm run cfr:solve -- --iterations 150 --evaluation-games 200 --rollouts-per-action 1 --max-actions 220 --top 50 --output /tmp/cfr-strategy.json
+      - name: Upload strategy report
+        if: contains(github.event.head_commit.message, '[solve-strategy]')
+        uses: actions/upload-artifact@v4
+        with:
+          name: cfr-strategy-report
+          path: /tmp/cfr-strategy.json
+          retention-days: 7
