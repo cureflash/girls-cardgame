@@ -1,0 +1,25 @@
+name: homura-chainboost2-eval
+
+on:
+  push:
+    branches:
+      - analysis/homura-chainboost2-eval
+    paths:
+      - 'tools/homura-otk-eval.mjs'
+      - '.github/workflows/homura-chainboost2-eval.yml'
+      - 'src/**'
+  workflow_dispatch:
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run 10 games against each opponent
+        env:
+          GAMES: 10
+        run: node tools/homura-otk-eval.mjs
