@@ -5,7 +5,7 @@ import { baselineGenome, chooseBaselineAction } from '../src/baseline-ai.js';
 import { GameEngine, PHASES, CARD_TYPES } from '../src/character-engine.js';
 import { CharacterAdapter } from '../src/character-adapter.js';
 import { CHARACTERS, createPlayerDeck, createNpcDeck } from '../src/card-data.js';
-import { ACTIONS } from '../src/rl-adapter.js';
+import { ACTIONS, encodeAttack } from '../src/rl-adapter.js';
 import { MATCH_VARIANTS, playSeries } from '../ga/match.mjs';
 
 test('browser baseline exposes separate Madoka and Mami policy slots', () => {
@@ -194,4 +194,79 @@ test('Nagisa baseline AI completes multi-control special decisions legally', () 
     adapter.applyAction(action, adapter.currentPlayer());
   }
   assert.ok(guard < 30);
+});
+
+function homuraEngine() {
+  const engine = new GameEngine({
+    players: [
+      { id: 'p0', name: CHARACTERS.homura.name, character: CHARACTERS.homura },
+      { id: 'p1', name: CHARACTERS.mami.name, character: CHARACTERS.mami },
+    ],
+    decks: [createPlayerDeck('homura'), createNpcDeck('mami')],
+    rng: () => 0.5,
+  });
+  engine.state.turn = 4;
+  engine.state.phase = PHASES.BATTLE_START;
+  engine.state.activePlayer = 0;
+  engine.state.priorityPlayer = 0;
+  engine.state.pendingDecision = null;
+  engine.state.chain = [];
+  engine.state.chainPassCount = 0;
+  engine.player(0).field = Array(5).fill(null);
+  engine.player(1).field = Array(5).fill(null);
+  engine.player(0).hand = [];
+  engine.player(1).hand = [];
+  engine.player(0).specialUsed = false;
+  return engine;
+}
+
+test('Homura AI refuses special when the current special turn cannot one-shot', () => {
+  const engine = homuraEngine();
+  engine.player(0).field[0] = monster('homura-3', 3);
+  engine.player(0).hand = [monster('homura-free-13', 13, CARD_TYPES.WITCH)];
+  engine.player(1).deck = Array.from({ length: 30 }, (_, i) => monster(`opp-deck-${i}`, 3));
+  const adapter = new CharacterAdapter(engine);
+
+  const action = chooseBaselineAction(adapter, 0, () => 0.5);
+  assert.notEqual(action, ACTIONS.SPECIAL);
+  assert.ok(adapter.legalActions(0).includes(action));
+});
+
+test('Homura AI uses special only when it has a deterministic one-shot line and follows that line', () => {
+  const engine = homuraEngine();
+  engine.player(0).field[0] = monster('homura-3', 3);
+  engine.player(0).hand = [monster('homura-free-13', 13, CARD_TYPES.WITCH)];
+  engine.player(1).deck = Array.from({ length: 13 }, (_, i) => monster(`opp-deck-${i}`, 3));
+  const adapter = new CharacterAdapter(engine);
+
+  let action = chooseBaselineAction(adapter, 0, () => 0.5);
+  assert.equal(action, ACTIONS.SPECIAL);
+  adapter.applyAction(action, 0);
+
+  let guard = 0;
+  while (engine.state.phase !== PHASES.GAME_OVER && guard++ < 20) {
+    const player = adapter.currentPlayer();
+    action = chooseBaselineAction(adapter, player, () => 0.5);
+    assert.ok(adapter.legalActions(player).includes(action));
+    adapter.applyAction(action, player);
+  }
+
+  assert.equal(engine.state.phase, PHASES.GAME_OVER);
+  assert.equal(engine.state.winner, 0);
+  assert.equal(engine.player(0).specialUsed, true);
+  assert.ok(guard < 20);
+});
+
+test('Homura AI will not take a non-special lethal direct attack', () => {
+  const engine = homuraEngine();
+  engine.state.phase = PHASES.BATTLE;
+  engine.player(0).field[0] = monster('homura-lethal-5', 5);
+  engine.player(1).deck = Array.from({ length: 5 }, (_, i) => monster(`opp-deck-${i}`, 3));
+  const adapter = new CharacterAdapter(engine);
+  const lethal = encodeAttack(0, null);
+
+  assert.ok(adapter.legalActions(0).includes(lethal));
+  const action = chooseBaselineAction(adapter, 0, () => 0.5);
+  assert.notEqual(action, lethal);
+  assert.ok(adapter.legalActions(0).includes(action));
 });
