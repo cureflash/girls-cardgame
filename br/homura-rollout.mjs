@@ -315,13 +315,13 @@ for (const pair of pairResults) {
 for (const row of Object.values(aggregate)) row.winRate = row.games ? row.wins / row.games : null;
 
 const report = {
-  format: 'girls-cardgame-homura-focused-mutual-rollout-v1',
+  format: 'girls-cardgame-homura-focused-mutual-rollout-v2-no-passive',
   policy: 'shared-default-evaluation plus equal hidden-information conservative rollout for all characters',
   gamesPerPair: games, samples, seed, maxActions, minGain,
   deckCondition: 'All five characters use mechanically identical 30-card decks; only character abilities and names/art skins differ.',
   sayakaRule: { passive: 'effective witch tribute threshold -3 as a character ability', special: 'return any 3 graveyard cards to deck, shuffle the whole deck, then end turn' },
   kyokoRule: { passive: 'none', special: 'at battle-start once per duel, use exactly one opposing familiar/witch as tribute toward summoning one witch from hand; pay any remaining cost with normal own tributes; the special summon is additional to the normal summon and ends the turn' },
-  homuraRule: { passive: 'all own familiars and witches have effective ATK +1, including tribute value', special: 'once per duel at battle-start, opponent cannot chain for the rest of that turn; Homura does not skip battle and can chain her own boost magic' },
+  homuraRule: { passive: 'none', special: 'once per duel at battle-start, opponent cannot chain for the rest of that turn; Homura does not skip battle and can chain her own boost magic' },
   pairResults, aggregate,
 };
 fs.writeFileSync(output, `${JSON.stringify(report, null, 2)}\n`);
