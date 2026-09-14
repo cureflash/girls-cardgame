@@ -93,7 +93,12 @@ function bestKyokoPlan(engine, playerIndex, opponentSlot = null) {
 function homuraSpecialScore(engine, playerIndex) {
   const self = engine.player(playerIndex);
   const opp = engine.player(engine.opponent(playerIndex));
-  const attackers = self.field.filter(card => isMonster(card) && card.attackedTurn !== engine.state.turn);
+  const fieldAttackers = self.field.filter(card => isMonster(card) && card.attackedTurn !== engine.state.turn);
+  const extraWitch = self.field.includes(null)
+    ? self.hand.filter(card => card.type === CARD_TYPES.WITCH)
+      .sort((a, b) => (b.attack ?? 0) - (a.attack ?? 0))[0] ?? null
+    : null;
+  const attackers = extraWitch ? [...fieldAttackers, extraWitch] : fieldAttackers;
   if (!attackers.length) return -Infinity;
 
   const maxAttack = Math.max(...attackers.map(card => card.attack ?? 0));
@@ -110,7 +115,8 @@ function homuraSpecialScore(engine, playerIndex) {
     + maxAttack * 5
     + maxBoost * 9
     + Math.max(0, bestVisibleSwing) * 7
-    + opp.hand.length * 5;
+    + opp.hand.length * 5
+    + (extraWitch ? 35 + (extraWitch.attack ?? 0) * 8 : 0);
 }
 
 function specialScore(character, engine, playerIndex) {
@@ -166,6 +172,24 @@ function choosePending(character, adapter, playerIndex, legal) {
   return null;
 }
 
+function chooseHomuraExtraWitch(adapter, playerIndex, legal) {
+  const marker = adapter.engine.state.homuraExtraWitchSummon;
+  if (!marker || marker.player !== playerIndex || marker.turn !== adapter.engine.state.turn) return null;
+  const hand = adapter.engine.player(playerIndex).hand;
+  let best = null;
+  for (const action of legal) {
+    if (action < ACTIONS.SUMMON_BASE || action >= ACTIONS.ATTACK_BASE) continue;
+    const offset = action - ACTIONS.SUMMON_BASE;
+    const handIndex = Math.floor(offset / RL_LIMITS.TRIBUTE_MASKS);
+    const tributeMask = offset % RL_LIMITS.TRIBUTE_MASKS;
+    const card = hand[handIndex];
+    if (tributeMask !== 0 || card?.type !== CARD_TYPES.WITCH) continue;
+    const score = card.attack ?? 0;
+    if (!best || score > best.score) best = { action, score };
+  }
+  return best?.action ?? null;
+}
+
 export function chooseRemainingCharacterAction(adapter, playerIndex = adapter.currentPlayer(), rng = Math.random) {
   const engine = adapter.engine;
   const character = engine.player(playerIndex).character?.id;
@@ -177,6 +201,11 @@ export function chooseRemainingCharacterAction(adapter, playerIndex = adapter.cu
 
   const pending = choosePending(character, adapter, playerIndex, legal);
   if (pending !== null) return pending;
+
+  if (character === 'homura') {
+    const freeWitch = chooseHomuraExtraWitch(adapter, playerIndex, legal);
+    if (freeWitch !== null) return freeWitch;
+  }
 
   if (legal.includes(ACTIONS.SPECIAL)) {
     if (specialScore(character, engine, playerIndex) >= policy.threshold) return ACTIONS.SPECIAL;
