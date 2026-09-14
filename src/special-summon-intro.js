@@ -1,8 +1,12 @@
 const SPECIAL_WITCH_CODES = new Set(['witch-walpurgis_13', 'witch-salvation_13']);
+const CHARACTER_IDS = ['madoka', 'mami', 'sayaka', 'kyoko', 'homura', 'nagisa'];
+
+const WALPURGIS_IMAGE_SRC = './assets/special-intro/walpurgis.webp?v=special-intro2';
+const WALPURGIS_RUNES_SRC = './assets/special-intro/walpurgis-runes.png?v=special-intro2';
 
 export const DOPPEL_VOICE_SOURCES = Object.freeze({
-  madoka: './assets/audio/doppel/madoka.mp3?v=doppel1',
-  mami: './assets/audio/doppel/mami.mp3?v=doppel1',
+  madoka: './assets/audio/doppel/madoka.mp3?v=doppel2',
+  mami: './assets/audio/doppel/mami.mp3?v=doppel2',
   sayaka: null,
   kyoko: null,
   homura: null,
@@ -10,7 +14,8 @@ export const DOPPEL_VOICE_SOURCES = Object.freeze({
 });
 
 export function isSpecialWitchSummon(event) {
-  return event?.type === 'summon' && SPECIAL_WITCH_CODES.has(event.card?.code);
+  return ['summon', 'revive'].includes(event?.type)
+    && SPECIAL_WITCH_CODES.has(event.card?.code);
 }
 
 export function doppelVoiceSource(characterId) {
@@ -91,18 +96,18 @@ export class SpecialSummonIntro {
     style.textContent = `
 #special-summon-intro[hidden]{display:none!important}
 #special-summon-intro{position:fixed;inset:0;z-index:10000;overflow:hidden;background:radial-gradient(circle at 25% 25%,rgba(120,80,160,.32),transparent 28%),radial-gradient(circle at 78% 20%,rgba(210,70,120,.25),transparent 24%),linear-gradient(180deg,#251831 0%,#1b1628 48%,#0f1016 100%);pointer-events:auto;isolation:isolate}
-#special-summon-intro::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 20% 18%,rgba(255,255,255,.05),transparent 10%),radial-gradient(circle at 75% 20%,rgba(255,255,255,.04),transparent 12%),repeating-radial-gradient(circle at 50% 58%,rgba(255,255,255,.04) 0 2px,transparent 3px 18px);opacity:.6}
-.special-intro-floor{position:absolute;left:-8%;right:-8%;bottom:-8%;height:46%;background:repeating-radial-gradient(ellipse at center,rgba(255,255,255,.10) 0 2px,transparent 3px 18px),linear-gradient(180deg,rgba(20,25,34,.25),rgba(12,13,18,.9));transform:perspective(600px) rotateX(61deg);transform-origin:bottom}
-.special-intro-enemy{position:absolute;left:27%;top:50%;width:min(40vw,520px);transform:translate(-50%,-50%) scale(.78) rotate(-2deg);opacity:0;filter:drop-shadow(0 18px 28px rgba(0,0,0,.82));will-change:opacity,filter}
+#special-summon-intro::before{content:"";position:absolute;inset:0;z-index:0;background:radial-gradient(circle at 20% 18%,rgba(255,255,255,.05),transparent 10%),radial-gradient(circle at 75% 20%,rgba(255,255,255,.04),transparent 12%),repeating-radial-gradient(circle at 50% 58%,rgba(255,255,255,.04) 0 2px,transparent 3px 18px);opacity:.6}
+.special-intro-floor{position:absolute;z-index:0;left:-8%;right:-8%;bottom:-8%;height:46%;background:repeating-radial-gradient(ellipse at center,rgba(255,255,255,.10) 0 2px,transparent 3px 18px),linear-gradient(180deg,rgba(20,25,34,.25),rgba(12,13,18,.9));transform:perspective(600px) rotateX(61deg);transform-origin:bottom}
+.special-intro-enemy{position:absolute;z-index:2;left:27%;top:50%;width:min(40vw,520px);max-height:82vh;object-fit:contain;transform:translate(-50%,-50%) scale(.78) rotate(-2deg);opacity:0;filter:drop-shadow(0 18px 28px rgba(0,0,0,.82));will-change:opacity,filter;display:block}
 .special-intro-pink,.special-intro-white,.special-intro-negative,.special-intro-title{position:absolute;inset:0;pointer-events:none}
-.special-intro-pink{background:radial-gradient(circle at 35% 45%,rgba(255,255,255,.96),rgba(255,90,180,.72) 18%,rgba(185,40,210,.34) 38%,transparent 62%);opacity:0;mix-blend-mode:screen}
-.special-intro-white{background:#fff;opacity:0;mix-blend-mode:screen}
-.special-intro-negative{background:#fff;opacity:0;mix-blend-mode:difference}
-.special-intro-title{display:flex;align-items:center;justify-content:flex-end;padding-right:6vw;box-sizing:border-box;opacity:0}
-.special-intro-brush{position:relative;width:min(58vw,860px);height:190px;display:flex;align-items:center;justify-content:center;transform:translateX(16vw)}
+.special-intro-pink{z-index:1;background:radial-gradient(circle at 35% 45%,rgba(255,255,255,.96),rgba(255,90,180,.72) 18%,rgba(185,40,210,.34) 38%,transparent 62%);opacity:0;mix-blend-mode:screen}
+.special-intro-white{z-index:4;background:#fff;opacity:0;mix-blend-mode:screen}
+.special-intro-negative{z-index:5;background:#fff;opacity:0;mix-blend-mode:difference}
+.special-intro-title{z-index:3;display:flex;align-items:center;justify-content:flex-end;padding-right:6vw;box-sizing:border-box;opacity:0}
+.special-intro-brush{position:relative;width:min(62vw,920px);height:210px;display:flex;align-items:center;justify-content:center;transform:translateX(16vw)}
 .special-intro-brush::before{content:"";position:absolute;inset:0;background:#080607;clip-path:polygon(2% 18%,8% 10%,15% 18%,24% 5%,31% 14%,40% 6%,48% 15%,56% 2%,64% 14%,73% 8%,83% 17%,96% 11%,92% 32%,99% 41%,93% 50%,98% 62%,89% 68%,96% 85%,82% 82%,73% 92%,62% 83%,51% 96%,40% 85%,30% 94%,21% 82%,10% 90%,15% 70%,4% 63%,11% 51%,3% 41%,10% 31%);filter:drop-shadow(0 0 7px rgba(0,0,0,.9))}
 .special-intro-brush::after{content:"";position:absolute;inset:18px 30px;background:linear-gradient(90deg,transparent 0 5%,rgba(255,255,255,.08) 5% 7%,transparent 8% 24%,rgba(255,255,255,.07) 25% 28%,transparent 29% 100%);opacity:.8}
-.special-intro-runes{position:relative;z-index:2;max-width:min(42vw,520px);max-height:86px;object-fit:contain;filter:brightness(1.15)}
+.special-intro-runes{position:relative;z-index:2;width:min(48vw,620px);max-width:100%;max-height:105px;object-fit:contain;display:block;filter:brightness(0) invert(1) drop-shadow(0 0 9px rgba(255,255,255,.28))}
 #special-summon-intro.run .special-intro-enemy{animation:specialEnemy 4.8s linear both}
 #special-summon-intro.run .special-intro-pink{animation:specialPink 4.8s linear both}
 #special-summon-intro.run .special-intro-white{animation:specialWhite 4.8s linear both}
@@ -124,8 +129,8 @@ export class SpecialSummonIntro {
     overlay.innerHTML = `
       <div class="special-intro-floor"></div>
       <div class="special-intro-pink"></div>
-      <img class="special-intro-enemy" src="./assets/special-intro/walpurgis.webp?v=special-intro1" alt="">
-      <div class="special-intro-title"><div class="special-intro-brush"><img class="special-intro-runes" src="./assets/special-intro/walpurgis-runes.png?v=special-intro1" alt=""></div></div>
+      <img class="special-intro-enemy" src="${WALPURGIS_IMAGE_SRC}" alt="">
+      <div class="special-intro-title"><div class="special-intro-brush"><img class="special-intro-runes" src="${WALPURGIS_RUNES_SRC}" alt=""></div></div>
       <div class="special-intro-white"></div>
       <div class="special-intro-negative"></div>`;
     this.document.head.append(style);
@@ -133,7 +138,12 @@ export class SpecialSummonIntro {
     return overlay;
   }
 
-  _activeCharacterId() {
+  _characterIdForEvent(event) {
+    const cardId = String(event?.card?.id ?? '');
+    const fromCard = CHARACTER_IDS.find(characterId =>
+      cardId.includes(`-${characterId}-`) || cardId.startsWith(`${characterId}-`)
+    );
+    if (fromCard) return fromCard;
     return this.document?.querySelector?.('#top-player.active, #bottom-player.active')?.dataset?.character ?? null;
   }
 
@@ -159,7 +169,7 @@ export class SpecialSummonIntro {
       const onError = () => done(false);
       audio.addEventListener?.('ended', onEnded, { once: true });
       audio.addEventListener?.('error', onError, { once: true });
-      this.voiceTimer = NATIVE_SET_TIMEOUT(() => done(true), 5000);
+      this.voiceTimer = NATIVE_SET_TIMEOUT(() => done(true), 30000);
       try {
         const result = audio.play();
         if (result?.catch) result.catch(() => done(false));
@@ -205,7 +215,7 @@ export class SpecialSummonIntro {
     if (!isSpecialWitchSummon(event) || this.running) return false;
     this.running = true;
     globalThis.__duelCutsceneActive = true;
-    const characterId = this._activeCharacterId();
+    const characterId = this._characterIdForEvent(event);
     await this._waitForVoice(characterId);
     if (!this.running) return true;
     this._startScene();
