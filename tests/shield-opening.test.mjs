@@ -29,7 +29,7 @@ function makeHomuraEngine() {
   return new GameEngine({
     players: [
       { id: 'p0', name: 'P0', character: { id: 'madoka', name: '鹿目まどか', openingHandModifier: 0 } },
-      { id: 'p1', name: 'ほむら', character: { id: 'homura', name: '暁美ほむら', openingHandModifier: 0 } },
+      { id: 'p1', name: 'ほむら', character: { id: 'homura', name: '暁美ほむら', openingHandModifier: 1 } },
     ],
     decks: [deck('a'), deck('b')],
     openingHand: 0,
@@ -120,30 +120,19 @@ test('shield also preserves the non-shield side when the shield user would win',
   assert.equal(e.state.battlePhaseEnded, true);
 });
 
-test('Homura gets +2 only on the first attack-up she uses on her turn', () => {
+test('Homura attack-up cards use their printed value without the removed +2 passive', () => {
   const e = makeHomuraEngine();
-  e.player(1).field[0] = familiar('homura-a', 3);
-  e.player(1).field[1] = familiar('homura-b', 3);
-  e.player(0).field[0] = familiar('defender-a', 6);
-  e.player(0).field[1] = familiar('defender-b', 6);
-  e.player(1).hand = [boost('first-boost', 2), boost('second-boost', 2)];
+  e.player(1).field[0] = familiar('homura', 3);
+  e.player(0).field[0] = familiar('defender', 6);
+  e.player(1).hand = [boost('boost', 2)];
 
   enterBattleAsPlayer1(e);
   e.attack(1, 0, 0);
-  e.respondChain(1, 'first-boost');
-  assert.equal(e.state.pendingDecision?.player, 1);
+  e.respondChain(1, 'boost');
   e.respondChain(1, null);
 
-  const firstBattle = e.state.events.filter(event => event.type === 'battleEnd').at(-1);
-  assert.equal(firstBattle?.attackValue, 7);
-  assert.equal(e.player(0).field[0], null);
-  assert.equal(e.player(1).graveyard.find(card => card.id === 'first-boost')?.value, 2);
-
-  e.attack(1, 1, 1);
-  e.respondChain(1, 'second-boost');
-
-  const secondBattle = e.state.events.filter(event => event.type === 'battleEnd').at(-1);
-  assert.equal(secondBattle?.attackValue, 5);
-  assert.equal(e.player(1).field[1], null);
-  assert.equal(e.player(0).field[1]?.id, 'defender-b');
+  const battle = e.state.events.filter(event => event.type === 'battleEnd').at(-1);
+  assert.equal(battle?.attackValue, 5);
+  assert.equal(e.player(1).field[0], null);
+  assert.equal(e.player(0).field[0]?.id, 'defender');
 });
