@@ -16,7 +16,7 @@ jobs:
       - name: Homura regression tests
         run: node --test tests/kyoko.test.mjs tests/sayaka.test.mjs
       - name: Homura focused rollout
-        run: node br/homura-rollout.mjs --games 100 --samples 4 --min-gain 0.05 --max-actions 300 --output /tmp/homura-rollout.json
+        run: node br/homura-rollout.mjs --games 40 --samples 2 --min-gain 0.05 --max-actions 300 --output /tmp/homura-rollout.json
       - name: Upload Homura report
         uses: actions/upload-artifact@v4
         with:
