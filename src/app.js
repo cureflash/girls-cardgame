@@ -1,6 +1,6 @@
-import { GameEngine, CARD_TYPES, PHASES } from './character-engine.js?v=fivechars1';
+import { GameEngine, CARD_TYPES, PHASES } from './character-engine.js?v=sixchars1';
 import { CHARACTERS, createPlayerDeck, createNpcDeck } from './card-data.js';
-import { CharacterAdapter } from './character-adapter.js?v=fivechars1';
+import { CharacterAdapter } from './character-adapter.js?v=sixchars1';
 import { RULES_VERSION } from './rl-adapter.js';
 import { chooseBaselineAction } from './baseline-ai.js';
 import { Policy } from './policy.js';
@@ -276,6 +276,7 @@ function renderActions() {
       const homuraLockActive = self.character.id === 'homura' && self.specialUsed && s.homuraChainLockTurn === s.turn;
       if (homuraLockActive) hint = '必殺技発動中：このターンは相手だけチェーン不可。ほむら側の強化魔法は使用できます。';
       else if (self.specialUsed) hint = '必殺技は使用済みです。バトルを始めましょう。';
+      else if (self.character.id === 'nagisa') hint = '必殺技で相手の1体を操って強制戦闘し、その解決後にターン終了します。';
       else if (specialEndsTurn(self.character.id)) hint = '必殺技を使うと、このターンのバトルはスキップしてターン終了します。';
       else hint = '必殺技を使っても、このままバトルへ進めます。相手はこのターン中チェーンできません。';
       root.append(
@@ -347,7 +348,12 @@ function renderDecision() {
     root.append(node('small', 'eyebrow', p.name), heading);
     const b = engine.state.battle;
     let atk = b.attackerBase + b.attackerBonus, def = b.defenderBase + b.defenderBonus;
-    for (const item of engine.state.chain) if (item.card.effect === 'boost') { if (item.player === b.attackerPlayer) atk += item.card.value; else def += item.card.value; }
+    for (const item of engine.state.chain) if (item.card.effect === 'boost') {
+      if (b.nagisaForced) {
+        if (item.player === b.defenderPlayer) def += item.card.value;
+      } else if (item.player === b.attackerPlayer) atk += item.card.value;
+      else def += item.card.value;
+    }
     root.append(node('p', '', b.direct ? `直接攻撃 · 攻撃力 ${atk}` : `攻撃 ${atk} ／ 防御側の攻撃力 ${def}`), node('p', 'muted', '魔法を選んで発動。選ばない場合は「発動しない」。'));
     decisionCardList(root, d.options.map(id => p.hand.find(c => c.id === id)), card => perform(() => engine.respondChain(d.player, card.id), { type: 'chain-response', cardId: card.id, cardName: card.name }));
     root.append(button('発動しない', () => perform(() => engine.respondChain(d.player), { type: 'chain-pass' }), 'secondary'));
@@ -399,6 +405,63 @@ function renderDecision() {
       }
     }
     root.append(list);
+  } else if (d.type === 'NAGISA_ATTACKER') {
+    const heading = node('h2', '', '操る相手モンスターを選択'); heading.id = 'decision-title';
+    root.append(node('small', 'eyebrow', p.name), heading, node('p', 'muted', '選んだ相手の使い魔・魔女に1回だけ攻撃を強制します。'));
+    const opponent = engine.player(d.opponentPlayer);
+    const list = node('div', 'modal-cards');
+    for (const slot of d.options) {
+      const card = opponent.field[slot];
+      if (!card) continue;
+      const b = cardButton(card, d.opponentPlayer, 'choice', slot);
+      b.onclick = () => perform(
+        () => engine.selectNagisaAttacker(d.player, slot),
+        { type: 'nagisa-attacker', slot, cardId: card.id, cardName: card.name },
+      );
+      list.append(b);
+    }
+    root.append(list);
+  } else if (d.type === 'NAGISA_TARGET') {
+    const opponent = engine.player(d.opponentPlayer);
+    const attackerCard = opponent.field[d.attackerSlot];
+    const heading = node('h2', '', `${attackerCard?.name ?? '選択したモンスター'}の攻撃先を選択`); heading.id = 'decision-title';
+    root.append(
+      node('small', 'eyebrow', p.name),
+      heading,
+      node('p', 'muted', '操られた攻撃側には盾・攻撃アップを使えません。攻撃される側は通常どおり使用できます。'),
+    );
+    const list = node('div', 'modal-cards');
+    for (const slot of d.opponentTargets) {
+      const card = opponent.field[slot];
+      if (!card) continue;
+      const b = cardButton(card, d.opponentPlayer, 'choice', slot);
+      b.append(node('span', 'plan-label', '相手の別モンスターへ攻撃'));
+      b.onclick = () => perform(
+        () => engine.resolveNagisaForcedBattle(d.player, 'opponent', slot),
+        { type: 'nagisa-forced-battle', targetSide: 'opponent', targetSlot: slot, targetId: card.id },
+      );
+      list.append(b);
+    }
+    for (const slot of d.ownTargets) {
+      const card = p.field[slot];
+      if (!card) continue;
+      const b = cardButton(card, d.player, 'choice', slot);
+      b.append(node('span', 'plan-label', '自分のモンスターへ自爆特攻'));
+      b.onclick = () => perform(
+        () => engine.resolveNagisaForcedBattle(d.player, 'self', slot),
+        { type: 'nagisa-forced-battle', targetSide: 'self', targetSlot: slot, targetId: card.id },
+      );
+      list.append(b);
+    }
+    root.append(list);
+    if (d.directAllowed) root.append(button(
+      '持ち主へ直接攻撃させる',
+      () => perform(
+        () => engine.resolveNagisaForcedBattle(d.player, 'direct'),
+        { type: 'nagisa-forced-battle', targetSide: 'direct', targetSlot: null },
+      ),
+      'special',
+    ));
   }
 
   if (!dialog.open) dialog.showModal();
