@@ -1,6 +1,7 @@
 import { ACTIVE_GENOMES } from './evolved-genome.js?v=g999';
 import { DEFAULT_GENOME, chooseEvaluationAction, normalizeEvaluationGenome } from './evaluation-ai.js';
 import { chooseNagisaAction } from './nagisa-ai.js';
+import { chooseHomuraAction } from './homura-ai.js';
 import { chooseRemainingCharacterAction } from './remaining-ai.js';
 
 const publishedGenomes = Object.freeze({
@@ -15,10 +16,13 @@ function genomeFor(adapter, player) {
 
 // Built-in browser opponent. Every current character now has its own policy path:
 // Madoka/Mami use evolved evaluation genomes, Nagisa uses forced-battle tactics,
-// and Sayaka/Kyoko/Homura use trained evaluation genomes plus character-specific tactics.
+// Homura uses an OTK-only setup/search policy, and Sayaka/Kyoko use trained evaluation
+// genomes plus character-specific tactics.
 export function chooseBaselineAction(adapter, player = adapter.currentPlayer(), rng = Math.random) {
   const nagisaAction = chooseNagisaAction(adapter, player, rng);
   if (nagisaAction !== null) return nagisaAction;
+  const homuraAction = chooseHomuraAction(adapter, player, rng);
+  if (homuraAction !== null) return homuraAction;
   const dedicatedAction = chooseRemainingCharacterAction(adapter, player, rng);
   if (dedicatedAction !== null) return dedicatedAction;
   return chooseEvaluationAction(adapter, player, genomeFor(adapter, player), rng);

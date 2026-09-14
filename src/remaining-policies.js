@@ -101,4 +101,4 @@ export const HOMURA_GENOME = Object.freeze(makeEvaluationGenome({
   selfLethal: -31.724293748401337,
   terminalWin: 1000,
   terminalLoss: -1000,
-}, { generation: 5, id: 'homura-otk-plus1-v1', parents: ['homura-g7-elite-0'] }));
+}, { generation: 5, id: 'homura-otk-chainboost2-plus1-v1', parents: ['homura-g7-elite-0'] }));

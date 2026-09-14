@@ -6,6 +6,7 @@ import { encodeSummon } from '../src/rl-adapter.js';
 
 const familiar = (id, attack = 3) => ({ id, name: id, type: CARD_TYPES.FAMILIAR, attack, rank: attack });
 const witch = (id, attack = 8) => ({ id, name: id, type: CARD_TYPES.WITCH, attack, rank: attack, tributeThreshold: attack });
+const magic = (id, value = 2) => ({ id, name: `攻撃力＋${value}`, type: CARD_TYPES.MAGIC, effect: 'boost', value, chainable: true });
 
 function makeEngine() {
   const deck = prefix => Array.from({ length: 20 }, (_, i) => familiar(`${prefix}-${i}`, 2));
@@ -20,7 +21,7 @@ function makeEngine() {
   });
 }
 
-test('Homura special enables one tribute-free monster summon before battle', () => {
+test('Homura special only locks the opponent chain and does not grant an extra summon', () => {
   const e = makeEngine();
   const adapter = new CharacterAdapter(e);
   e.player(0).hand = [witch('witch-13', 13), familiar('familiar-5', 5)];
@@ -33,46 +34,57 @@ test('Homura special enables one tribute-free monster summon before battle', () 
 
   assert.equal(e.state.homuraChainLockTurn, e.state.turn);
   assert.equal(e.state.homuraChainLockPlayer, 1);
-  assert.deepEqual(e.validTributeSets(0, e.player(0).hand[0]), [{ slots: [], handIds: [], total: 0, homuraFree: true }]);
-  assert.equal(e.canSummon(0, 'witch-13'), true);
-  assert.equal(e.canSummon(0, 'familiar-5'), true);
-  assert.equal(adapter.legalActions(0).includes(encodeSummon(0, 0)), true);
-  assert.equal(adapter.legalActions(0).includes(encodeSummon(1, 0)), true);
-
-  adapter.applyAction(encodeSummon(1, 0), 0);
-
-  assert.equal(e.player(0).field.some(card => card?.id === 'familiar-5'), true);
-  assert.equal(e.player(0).hand.some(card => card.id === 'familiar-5'), false);
-  assert.equal(e.state.homuraExtraMonsterSummon, null);
-  assert.equal(e.canSummon(0, 'witch-13'), false, 'the extra summon is limited to one monster');
-});
-
-test('Homura can choose a witch for the extra summon without tributes', () => {
-  const e = makeEngine();
-  const adapter = new CharacterAdapter(e);
-  e.player(0).hand = [witch('witch-13', 13)];
-  e.enterBattlePhase(0);
-  e.activateSpecial(0);
-
-  assert.equal(adapter.legalActions(0).includes(encodeSummon(0, 0)), true);
-  adapter.applyAction(encodeSummon(0, 0), 0);
-
-  assert.equal(e.player(0).field.some(card => card?.id === 'witch-13'), true);
-  assert.equal(e.player(0).graveyard.length, 0);
-});
-
-test('Homura may skip the extra monster summon and proceed to battle', () => {
-  const e = makeEngine();
-  e.player(0).hand = [familiar('familiar-5', 5), witch('witch-8', 8)];
-  e.enterBattlePhase(0);
-  e.activateSpecial(0);
-  assert.equal(e.canSummon(0, 'familiar-5'), true);
-  assert.equal(e.canSummon(0, 'witch-8'), true);
+  assert.equal(e.state.homuraExtraMonsterSummon, undefined);
+  assert.equal(e.canSummon(0, 'witch-13'), false);
+  assert.equal(e.canSummon(0, 'familiar-5'), false);
+  assert.equal(adapter.legalActions(0).includes(encodeSummon(0, 0)), false);
+  assert.equal(adapter.legalActions(0).includes(encodeSummon(1, 0)), false);
 
   e.continueBattlePhase(0);
-
   assert.equal(e.state.phase, PHASES.BATTLE);
-  assert.equal(e.state.homuraExtraMonsterSummon, null);
+  assert.equal(e.player(0).hand.some(card => card.id === 'witch-13'), true);
   assert.equal(e.player(0).hand.some(card => card.id === 'familiar-5'), true);
-  assert.equal(e.player(0).hand.some(card => card.id === 'witch-8'), true);
+});
+
+test('Homura attack-up magic always gains an additional +2', () => {
+  const e = makeEngine();
+  e.state.battle = {
+    attackerPlayer: 0,
+    attackerSlot: 0,
+    defenderPlayer: 1,
+    defenderSlot: 0,
+    direct: false,
+    attackerBase: 4,
+    defenderBase: 4,
+    attackerBonus: 0,
+    defenderBonus: 0,
+    damagePrevented: [false, false],
+    endBattlePhase: false,
+  };
+
+  e.resolveMagic(0, magic('boost-5', 5));
+  assert.equal(e.state.battle.attackerBonus, 7);
+  const event = e.state.events.at(-1);
+  assert.equal(event.type, 'magic');
+  assert.equal(event.card.value, 7);
+});
+
+test('the +2 attack-up passive does not modify the opponent magic', () => {
+  const e = makeEngine();
+  e.state.battle = {
+    attackerPlayer: 0,
+    attackerSlot: 0,
+    defenderPlayer: 1,
+    defenderSlot: 0,
+    direct: false,
+    attackerBase: 4,
+    defenderBase: 4,
+    attackerBonus: 0,
+    defenderBonus: 0,
+    damagePrevented: [false, false],
+    endBattlePhase: false,
+  };
+
+  e.resolveMagic(1, magic('enemy-boost-5', 5));
+  assert.equal(e.state.battle.defenderBonus, 5);
 });

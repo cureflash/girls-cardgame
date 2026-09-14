@@ -220,11 +220,11 @@ function homuraEngine() {
   return engine;
 }
 
-test('Homura AI refuses special when the current special turn cannot one-shot', () => {
+test('Homura AI refuses special when chain lock plus boosted magic still cannot one-shot', () => {
   const engine = homuraEngine();
-  engine.player(0).field[0] = monster('homura-3', 3);
-  engine.player(0).hand = [monster('homura-free-13', 13, CARD_TYPES.WITCH)];
-  engine.player(1).deck = Array.from({ length: 30 }, (_, i) => monster(`opp-deck-${i}`, 3));
+  engine.player(0).field[0] = monster('homura-6', 6);
+  engine.player(0).hand = [magic('homura-boost-5', 'boost', 5)];
+  engine.player(1).deck = Array.from({ length: 14 }, (_, i) => monster(`opp-deck-${i}`, 3));
   const adapter = new CharacterAdapter(engine);
 
   const action = chooseBaselineAction(adapter, 0, () => 0.5);
@@ -232,10 +232,10 @@ test('Homura AI refuses special when the current special turn cannot one-shot', 
   assert.ok(adapter.legalActions(0).includes(action));
 });
 
-test('Homura AI uses special only when it has a deterministic one-shot line and follows that line', () => {
+test('Homura AI uses special when chain lock plus the +2 boost passive gives a deterministic one-shot', () => {
   const engine = homuraEngine();
-  engine.player(0).field[0] = monster('homura-3', 3);
-  engine.player(0).hand = [monster('homura-free-13', 13, CARD_TYPES.WITCH)];
+  engine.player(0).field[0] = monster('homura-6', 6);
+  engine.player(0).hand = [magic('homura-boost-5', 'boost', 5)];
   engine.player(1).deck = Array.from({ length: 13 }, (_, i) => monster(`opp-deck-${i}`, 3));
   const adapter = new CharacterAdapter(engine);
 
