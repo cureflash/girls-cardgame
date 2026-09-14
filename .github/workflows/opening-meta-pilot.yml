@@ -1,0 +1,38 @@
+name: opening-meta-pilot
+
+on:
+  push:
+    branches: ['**']
+
+jobs:
+  four-character:
+    if: contains(github.event.head_commit.message, '[opening-meta-pilot]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Quick four-character rollout
+        run: node br/four-character-rollout.mjs --games 40 --samples 2 --min-gain 0.05 --max-actions 300 --output /tmp/opening-meta-pilot-four.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: opening-meta-pilot-four
+          path: /tmp/opening-meta-pilot-four.json
+          retention-days: 7
+
+  homura-matchups:
+    if: contains(github.event.head_commit.message, '[opening-meta-pilot]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Quick Homura rollout
+        run: node br/homura-rollout.mjs --games 40 --samples 2 --min-gain 0.05 --max-actions 300 --output /tmp/opening-meta-pilot-homura.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: opening-meta-pilot-homura
+          path: /tmp/opening-meta-pilot-homura.json
+          retention-days: 7
