@@ -136,6 +136,44 @@ export class GameEngine extends NagisaGameEngine {
     this.beginChainWindow(playerIndex);
   }
 
+  respondChain(playerIndex, cardId = null) {
+    const decision = this.state.pendingDecision;
+    const player = this.player(playerIndex);
+    const card = cardId ? player.hand.find(item => item.id === cardId) : null;
+    const firstOwnTurnBoost = !!card
+      && decision?.type === 'CHAIN_RESPONSE'
+      && decision.player === playerIndex
+      && decision.options.includes(cardId)
+      && player.character?.id === 'homura'
+      && this.state.activePlayer === playerIndex
+      && card.effect === 'boost'
+      && this.state.homuraBoostPassiveTurn !== this.state.turn;
+
+    if (firstOwnTurnBoost) {
+      this.state.homuraBoostPassiveTurn = this.state.turn;
+      this.state.homuraBoostPassiveCardId = card.id;
+    }
+    return super.respondChain(playerIndex, cardId);
+  }
+
+  resolveMagic(playerIndex, card) {
+    const empowered = card?.effect === 'boost'
+      && this.player(playerIndex).character?.id === 'homura'
+      && this.state.activePlayer === playerIndex
+      && this.state.homuraBoostPassiveTurn === this.state.turn
+      && this.state.homuraBoostPassiveCardId === card.id;
+    if (!empowered) return super.resolveMagic(playerIndex, card);
+
+    const originalValue = card.value ?? 0;
+    card.value = originalValue + 2;
+    this.log(`${this.player(playerIndex).name}のパッシブで${card.name}の上昇値を+2`);
+    try {
+      return super.resolveMagic(playerIndex, card);
+    } finally {
+      card.value = originalValue;
+    }
+  }
+
   canActivateMagic(playerIndex, card) {
     const battle = this.state.battle;
     if (
