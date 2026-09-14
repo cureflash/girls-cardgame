@@ -20,10 +20,10 @@ function makeEngine() {
   });
 }
 
-test('Homura special enables one tribute-free witch summon before battle', () => {
+test('Homura special enables one tribute-free monster summon before battle', () => {
   const e = makeEngine();
   const adapter = new CharacterAdapter(e);
-  e.player(0).hand = [witch('witch-13', 13), witch('witch-8', 8)];
+  e.player(0).hand = [witch('witch-13', 13), familiar('familiar-5', 5)];
   e.player(0).field[0] = familiar('already-summoned', 4);
   e.player(0).summonedThisTurn = true;
 
@@ -35,26 +35,44 @@ test('Homura special enables one tribute-free witch summon before battle', () =>
   assert.equal(e.state.homuraChainLockPlayer, 1);
   assert.deepEqual(e.validTributeSets(0, e.player(0).hand[0]), [{ slots: [], handIds: [], total: 0, homuraFree: true }]);
   assert.equal(e.canSummon(0, 'witch-13'), true);
+  assert.equal(e.canSummon(0, 'familiar-5'), true);
   assert.equal(adapter.legalActions(0).includes(encodeSummon(0, 0)), true);
+  assert.equal(adapter.legalActions(0).includes(encodeSummon(1, 0)), true);
 
+  adapter.applyAction(encodeSummon(1, 0), 0);
+
+  assert.equal(e.player(0).field.some(card => card?.id === 'familiar-5'), true);
+  assert.equal(e.player(0).hand.some(card => card.id === 'familiar-5'), false);
+  assert.equal(e.state.homuraExtraMonsterSummon, null);
+  assert.equal(e.canSummon(0, 'witch-13'), false, 'the extra summon is limited to one monster');
+});
+
+test('Homura can choose a witch for the extra summon without tributes', () => {
+  const e = makeEngine();
+  const adapter = new CharacterAdapter(e);
+  e.player(0).hand = [witch('witch-13', 13)];
+  e.enterBattlePhase(0);
+  e.activateSpecial(0);
+
+  assert.equal(adapter.legalActions(0).includes(encodeSummon(0, 0)), true);
   adapter.applyAction(encodeSummon(0, 0), 0);
 
   assert.equal(e.player(0).field.some(card => card?.id === 'witch-13'), true);
-  assert.equal(e.player(0).hand.some(card => card.id === 'witch-13'), false);
-  assert.equal(e.state.homuraExtraWitchSummon, null);
-  assert.equal(e.canSummon(0, 'witch-8'), false, 'the extra summon is limited to one witch');
+  assert.equal(e.player(0).graveyard.length, 0);
 });
 
-test('Homura may skip the extra witch summon and proceed to battle', () => {
+test('Homura may skip the extra monster summon and proceed to battle', () => {
   const e = makeEngine();
-  e.player(0).hand = [witch('witch-8', 8)];
+  e.player(0).hand = [familiar('familiar-5', 5), witch('witch-8', 8)];
   e.enterBattlePhase(0);
   e.activateSpecial(0);
+  assert.equal(e.canSummon(0, 'familiar-5'), true);
   assert.equal(e.canSummon(0, 'witch-8'), true);
 
   e.continueBattlePhase(0);
 
   assert.equal(e.state.phase, PHASES.BATTLE);
-  assert.equal(e.state.homuraExtraWitchSummon, null);
+  assert.equal(e.state.homuraExtraMonsterSummon, null);
+  assert.equal(e.player(0).hand.some(card => card.id === 'familiar-5'), true);
   assert.equal(e.player(0).hand.some(card => card.id === 'witch-8'), true);
 });
