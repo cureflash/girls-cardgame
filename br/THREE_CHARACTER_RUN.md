@@ -1,5 +1,7 @@
 # Three-character round robin
 
-Run the shared-policy pairwise balance probe for Madoka, Mami, and Sayaka after the Sayaka mechanics tests pass.
+Re-run the equal hidden-information rollout comparison after these rule corrections:
 
-Then run the equal hidden-information rollout comparison so all three characters receive the same search capability.
+- Madoka, Mami, and Sayaka have mechanically identical 30-card deck contents; only character card names/art skins differ.
+- Sayaka's tribute reduction is a character passive, not a modified card stat.
+- Sayaka returns any three graveyard cards to the deck and then shuffles the whole deck.
