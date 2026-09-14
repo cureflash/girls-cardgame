@@ -5,6 +5,7 @@ export const CHARACTERS = {
   mami: { id: 'mami', name: '巴マミ', passive: '初期手札が1枚多い', special: 'ティロ・フィナーレ', image: './assets/characters/mami.webp' },
   sayaka: { id: 'sayaka', name: '美樹さやか', passive: '魔女召喚の生贄に必要な攻撃力合計を3減らす', special: '墓地の任意のカード3枚をデッキに戻してシャッフル', image: null },
   kyoko: { id: 'kyoko', name: '佐倉杏子', passive: 'なし', special: '相手の使い魔・魔女1体を生贄にして魔女召喚', image: null },
+  homura: { id: 'homura', name: '暁美ほむら', passive: '使い魔・魔女の攻撃力＋1', special: 'なし', image: null },
 };
 const SKINS = {
   madoka: {
@@ -23,6 +24,11 @@ const SKINS = {
     witches: [['rose_garden_8', '薔薇園の魔女', 8, 2], ['class_representative_8', '委員長の魔女', 8, 2], ['mermaid_a_10', '人魚の魔女 A', 10, 1], ['mermaid_b_10', '人魚の魔女 B', 10, 1], ['salvation_13', '救済の魔女', 13, 1]],
   },
   kyoko: {
+    assetCharacter: 'madoka',
+    familiars: [['butterfly', '薔薇園の魔女の使い魔'], ['legs', '委員長の魔女の使い魔']],
+    witches: [['rose_garden_8', '薔薇園の魔女', 8, 2], ['class_representative_8', '委員長の魔女', 8, 2], ['mermaid_a_10', '人魚の魔女 A', 10, 1], ['mermaid_b_10', '人魚の魔女 B', 10, 1], ['salvation_13', '救済の魔女', 13, 1]],
+  },
+  homura: {
     assetCharacter: 'madoka',
     familiars: [['butterfly', '薔薇園の魔女の使い魔'], ['legs', '委員長の魔女の使い魔']],
     witches: [['rose_garden_8', '薔薇園の魔女', 8, 2], ['class_representative_8', '委員長の魔女', 8, 2], ['mermaid_a_10', '人魚の魔女 A', 10, 1], ['mermaid_b_10', '人魚の魔女 B', 10, 1], ['salvation_13', '救済の魔女', 13, 1]],
@@ -56,4 +62,5 @@ export const createMadokaDeck = () => createDeck('madoka');
 export const createMamiDeck = () => createDeck('mami');
 export const createSayakaDeck = () => createDeck('sayaka');
 export const createKyokoDeck = () => createDeck('kyoko');
+export const createHomuraDeck = () => createDeck('homura');
 export const createPrototypeDeck = createMadokaDeck;
