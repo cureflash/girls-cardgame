@@ -4,28 +4,7 @@ export { PHASES, CARD_TYPES };
 
 export class GameEngine extends BaseGameEngine {
   _effectiveMonsterAttack(playerIndex, card) {
-    const base = card?.attack ?? 0;
-    if (!card || ![CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(card.type)) return base;
-    if (this.player(playerIndex).character?.id === 'homura' && !this._homuraSummonUsesBoostedCards) return base + 1;
-    return base;
-  }
-
-  _handTributePlans(playerIndex, witchCard) {
-    const p = this.player(playerIndex);
-    if (p.character?.id !== 'homura') return super._handTributePlans(playerIndex, witchCard);
-    const familiars = p.hand.filter(card => card.id !== witchCard.id && card.type === CARD_TYPES.FAMILIAR);
-    const plans = new Map([[0, []]]);
-    for (const card of familiars) {
-      for (const [sum, ids] of [...plans.entries()]) {
-        const next = sum + this._effectiveMonsterAttack(playerIndex, card);
-        const candidate = [...ids, card.id];
-        const current = plans.get(next);
-        if (!current || candidate.length < current.length) plans.set(next, candidate);
-      }
-    }
-    return [...plans.entries()]
-      .map(([total, handIds]) => ({ total, handIds }))
-      .sort((a, b) => a.total - b.total || a.handIds.length - b.handIds.length);
+    return card?.attack ?? 0;
   }
 
   _sayakaEffectiveThreshold(playerIndex, witchCard) {
@@ -36,36 +15,6 @@ export class GameEngine extends BaseGameEngine {
   }
 
   validTributeSets(playerIndex, witchCard) {
-    const p = this.player(playerIndex);
-    if (p.character?.id === 'homura') {
-      const fieldCards = p.field
-        .map((card, slot) => ({ card, slot }))
-        .filter(item => item.card && [CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(item.card.type));
-      const handPlans = this._handTributePlans(playerIndex, witchCard);
-      const threshold = witchCard?.tributeThreshold ?? 0;
-      const results = [];
-      const n = fieldCards.length;
-      for (let mask = 0; mask < (1 << n); mask++) {
-        const slots = [];
-        let fieldTotal = 0;
-        for (let i = 0; i < n; i++) {
-          if (mask & (1 << i)) {
-            slots.push(fieldCards[i].slot);
-            fieldTotal += this._effectiveMonsterAttack(playerIndex, fieldCards[i].card);
-          }
-        }
-        if (!p.field.includes(null) && slots.length === 0) continue;
-        const needed = Math.max(0, threshold - fieldTotal);
-        const handPlan = handPlans.find(plan => plan.total >= needed);
-        if (!handPlan) continue;
-        if (slots.length === 0 && handPlan.handIds.length === 0) continue;
-        results.push({ slots, handIds: handPlan.handIds, total: fieldTotal + handPlan.total });
-      }
-      return results.sort((a, b) => a.total - b.total
-        || (a.slots.length + a.handIds.length) - (b.slots.length + b.handIds.length)
-        || a.slots.length - b.slots.length);
-    }
-
     if (this._sayakaSummonUsesDiscountedCard) return super.validTributeSets(playerIndex, witchCard);
     const threshold = this._sayakaEffectiveThreshold(playerIndex, witchCard);
     if (threshold === (witchCard?.tributeThreshold ?? 0)) return super.validTributeSets(playerIndex, witchCard);
@@ -94,44 +43,7 @@ export class GameEngine extends BaseGameEngine {
       }
     }
 
-    if (p.character?.id === 'homura' && card?.type === CARD_TYPES.WITCH) {
-      const boosted = [
-        ...p.field.filter(item => item && [CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(item.type)),
-        ...p.hand.filter(item => item.id !== cardId && item.type === CARD_TYPES.FAMILIAR),
-      ];
-      for (const item of boosted) item.attack = (item.attack ?? 0) + 1;
-      this._homuraSummonUsesBoostedCards = true;
-      try {
-        return super.summon(playerIndex, cardId, tributeRefs);
-      } finally {
-        this._homuraSummonUsesBoostedCards = false;
-        for (const item of boosted) item.attack = Math.max(0, (item.attack ?? 0) - 1);
-      }
-    }
-
     return super.summon(playerIndex, cardId, tributeRefs);
-  }
-
-  attack(playerIndex, attackerSlot, targetSlot = null) {
-    const attacker = this.player(playerIndex).field[attackerSlot];
-    const opponentIndex = this.opponent(playerIndex);
-    const defender = targetSlot === null ? null : this.player(opponentIndex).field[targetSlot];
-    const boosted = [];
-    if (attacker && this.player(playerIndex).character?.id === 'homura'
-      && [CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(attacker.type)) {
-      attacker.attack = (attacker.attack ?? 0) + 1;
-      boosted.push(attacker);
-    }
-    if (defender && this.player(opponentIndex).character?.id === 'homura'
-      && [CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(defender.type)) {
-      defender.attack = (defender.attack ?? 0) + 1;
-      boosted.push(defender);
-    }
-    try {
-      return super.attack(playerIndex, attackerSlot, targetSlot);
-    } finally {
-      for (const item of boosted) item.attack = Math.max(0, (item.attack ?? 0) - 1);
-    }
   }
 
   _homuraChainLocked(playerIndex) {
