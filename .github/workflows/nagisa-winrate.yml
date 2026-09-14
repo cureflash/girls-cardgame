@@ -1,0 +1,17 @@
+name: nagisa-winrate
+
+on:
+  push:
+    branches:
+      - analysis/nagisa-winrate
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Nagisa matchup benchmark
+        run: node tools/nagisa-winrate.mjs
