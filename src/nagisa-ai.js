@@ -1,4 +1,6 @@
 import { ACTIONS, ATTACK_TARGETS, RL_LIMITS } from './rl-adapter.js';
+import { inspectEvaluationActions } from './evaluation-ai.js';
+import { NAGISA_GENOME, NAGISA_SPECIAL_THRESHOLD } from './nagisa-policy.js';
 
 function monster(card) {
   return !!card && (card.type === 'familiar' || card.type === 'witch');
@@ -38,7 +40,7 @@ function targetScore(engine, playerIndex, attackerSlot, targetSide, targetSlot =
     const lethal = damage >= opponent.deck.length ? 10000 : 0;
     return lethal + attack * 6 + damage * 12;
   }
-  if (attack === defend) return attack - defend;
+  if (attack === defend) return 0;
   return -(defend * 6 + (attack - defend) * 12);
 }
 
@@ -88,7 +90,16 @@ function chooseForcedChain(adapter, playerIndex, legal) {
   return legal.includes(ACTIONS.PASS) ? ACTIONS.PASS : legal[0] ?? null;
 }
 
-export function chooseNagisaAction(adapter, playerIndex = adapter.currentPlayer()) {
+function chooseEvaluationActionWithoutSpecial(adapter, playerIndex, rng) {
+  const ranked = inspectEvaluationActions(adapter, playerIndex, NAGISA_GENOME)
+    .filter(item => item.action !== ACTIONS.SPECIAL);
+  if (!ranked.length) return null;
+  const best = ranked[0].score;
+  const tied = ranked.filter(item => Math.abs(item.score - best) < 1e-9);
+  return tied[Math.floor(rng() * tied.length)].action;
+}
+
+export function chooseNagisaAction(adapter, playerIndex = adapter.currentPlayer(), rng = Math.random) {
   const engine = adapter.engine;
   const state = engine.state;
   const legal = adapter.legalActions(playerIndex);
@@ -129,11 +140,19 @@ export function chooseNagisaAction(adapter, playerIndex = adapter.currentPlayer(
     return best?.action ?? legal[0];
   }
 
-  if (engine.player(playerIndex).character?.id === 'nagisa' && legal.includes(ACTIONS.SPECIAL)) {
+  if (engine.player(playerIndex).character?.id !== 'nagisa') return null;
+
+  if (legal.includes(ACTIONS.SPECIAL)) {
     const attackerSlots = monsterSlots(engine.player(engine.opponent(playerIndex)).field);
     const best = attackerSlots.map(slot => bestTarget(engine, playerIndex, slot)).filter(Boolean).sort((a, b) => b.score - a.score)[0];
-    if (best?.score > 0) return ACTIONS.SPECIAL;
+    if (best?.score > NAGISA_SPECIAL_THRESHOLD) return ACTIONS.SPECIAL;
+    const normalAction = chooseEvaluationActionWithoutSpecial(adapter, playerIndex, rng);
+    if (normalAction !== null) return normalAction;
   }
 
-  return null;
+  const ranked = inspectEvaluationActions(adapter, playerIndex, NAGISA_GENOME);
+  if (!ranked.length) return null;
+  const best = ranked[0].score;
+  const tied = ranked.filter(item => Math.abs(item.score - best) < 1e-9);
+  return tied[Math.floor(rng() * tied.length)].action;
 }
