@@ -1,0 +1,25 @@
+name: homura-otk-roundrobin
+
+on:
+  push:
+    branches:
+      - analysis/homura-otk-roundrobin
+    paths:
+      - 'tools/homura-otk-roundrobin.mjs'
+      - '.github/workflows/homura-otk-roundrobin.yml'
+      - 'src/**'
+  workflow_dispatch:
+
+jobs:
+  roundrobin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run 100 games per pair
+        env:
+          GAMES: 100
+        run: node tools/homura-otk-roundrobin.mjs
