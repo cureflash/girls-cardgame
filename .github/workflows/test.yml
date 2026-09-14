@@ -96,6 +96,16 @@ jobs:
           name: current-meta-best-response
           path: /tmp/current-meta-best-response.json
           retention-days: 7
+      - name: Reverse best response versus current-meta champions
+        if: contains(github.event.head_commit.message, '[confirm-current-meta-mami-best-response]')
+        run: node br/confirm-current-meta.mjs --pair ga/current-meta-analysis-pair.json --character mami --games 100 --samples 16 --min-gain 0.05 --max-actions 300 --output /tmp/current-meta-mami-best-response.json
+      - name: Upload reverse current-meta best response
+        if: contains(github.event.head_commit.message, '[confirm-current-meta-mami-best-response]')
+        uses: actions/upload-artifact@v4
+        with:
+          name: current-meta-mami-best-response
+          path: /tmp/current-meta-mami-best-response.json
+          retention-days: 7
       - name: Dual rollout equilibrium probe
         if: contains(github.event.head_commit.message, '[dual-rollout]')
         run: node br/dual-current-meta.mjs --pair ga/current-meta-analysis-pair.json --games 100 --samples 16 --min-gain 0.05 --max-actions 300 --output /tmp/dual-current-meta.json
