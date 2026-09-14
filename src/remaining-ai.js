@@ -18,11 +18,13 @@ const POLICY = Object.freeze({
 
 const isMonster = card => !!card && [CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(card.type);
 
-function chooseRanked(adapter, playerIndex, genome, excluded = new Set()) {
+function chooseRanked(adapter, playerIndex, genome, rng, excluded = new Set()) {
   const ranked = inspectEvaluationActions(adapter, playerIndex, genome)
     .filter(item => !excluded.has(item.action));
   if (!ranked.length) return null;
-  return ranked[0].action;
+  const best = ranked[0].score;
+  const tied = ranked.filter(item => Math.abs(item.score - best) < 1e-9);
+  return tied[Math.floor(rng() * tied.length)].action;
 }
 
 function recycleValue(card) {
@@ -164,7 +166,7 @@ function choosePending(character, adapter, playerIndex, legal) {
   return null;
 }
 
-export function chooseRemainingCharacterAction(adapter, playerIndex = adapter.currentPlayer()) {
+export function chooseRemainingCharacterAction(adapter, playerIndex = adapter.currentPlayer(), rng = Math.random) {
   const engine = adapter.engine;
   const character = engine.player(playerIndex).character?.id;
   const policy = POLICY[character];
@@ -178,11 +180,11 @@ export function chooseRemainingCharacterAction(adapter, playerIndex = adapter.cu
 
   if (legal.includes(ACTIONS.SPECIAL)) {
     if (specialScore(character, engine, playerIndex) >= policy.threshold) return ACTIONS.SPECIAL;
-    const normal = chooseRanked(adapter, playerIndex, policy.genome, new Set([ACTIONS.SPECIAL]));
+    const normal = chooseRanked(adapter, playerIndex, policy.genome, rng, new Set([ACTIONS.SPECIAL]));
     if (normal !== null) return normal;
   }
 
-  return chooseRanked(adapter, playerIndex, policy.genome);
+  return chooseRanked(adapter, playerIndex, policy.genome, rng);
 }
 
 export function dedicatedPolicy(characterId) {
