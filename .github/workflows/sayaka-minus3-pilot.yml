@@ -13,11 +13,28 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Sayaka minus-3 pilot rollout
-        run: node br/four-character-rollout.mjs --games 40 --samples 4 --min-gain 0.05 --max-actions 300 --output /tmp/sayaka-minus3-pilot.json
-      - name: Upload Sayaka minus-3 pilot
+      - name: Build focused Sayaka runner
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          src = Path('br/four-character-rollout.mjs').read_text()
+          replacement = """const pairs = [
+            ['madoka', 'sayaka'],
+            ['mami', 'sayaka'],
+            ['sayaka', 'kyoko'],
+          ];
+          const pairResults"""
+          out, n = re.subn(r"const pairs = \[.*?\];\nconst pairResults", replacement, src, count=1, flags=re.S)
+          if n != 1:
+              raise SystemExit('pair list replacement failed')
+          Path('br/_sayaka-minus3-focused.mjs').write_text(out)
+          PY
+      - name: Sayaka minus-3 100-game focused rollout
+        run: node br/_sayaka-minus3-focused.mjs --games 100 --samples 4 --min-gain 0.05 --max-actions 300 --output /tmp/sayaka-minus3-focused.json
+      - name: Upload Sayaka minus-3 focused report
         uses: actions/upload-artifact@v4
         with:
-          name: sayaka-minus3-pilot
-          path: /tmp/sayaka-minus3-pilot.json
+          name: sayaka-minus3-focused
+          path: /tmp/sayaka-minus3-focused.json
           retention-days: 7
