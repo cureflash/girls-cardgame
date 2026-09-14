@@ -118,9 +118,19 @@ test('controlled attacker cannot receive magic while Nagisa defender can', () =>
   assert.ok(engine.state.pendingDecision.options.includes('nagisa-shield'));
 });
 
-test('Nagisa baseline AI uses the special and completes its staged target selection', () => {
+test('Nagisa AI holds the special when the forced battle value is too low', () => {
   const engine = nagisaEngine();
   engine.player(1).field[0] = monster('enemy-5', 5);
+  const adapter = new CharacterAdapter(engine);
+
+  const action = chooseBaselineAction(adapter, 0);
+  assert.ok(adapter.legalActions(0).includes(action));
+  assert.notEqual(action, ACTIONS.SPECIAL);
+});
+
+test('Nagisa baseline AI uses the special when the forced battle value is high and completes its staged target selection', () => {
+  const engine = nagisaEngine();
+  engine.player(1).field[0] = monster('enemy-13', 13);
   const adapter = new CharacterAdapter(engine);
 
   let action = chooseBaselineAction(adapter, 0);
@@ -137,5 +147,5 @@ test('Nagisa baseline AI uses the special and completes its staged target select
 
   const damage = engine.state.events.find(event => event.type === 'damage' && event.forced);
   assert.equal(damage.player, 1);
-  assert.equal(damage.amount, 5);
+  assert.equal(damage.amount, 13);
 });
