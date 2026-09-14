@@ -1,0 +1,25 @@
+name: remaining-ai-train
+
+on:
+  push:
+    branches:
+      - analysis/remaining-ai-train
+  workflow_dispatch:
+
+jobs:
+  train:
+    strategy:
+      fail-fast: false
+      matrix:
+        character: [sayaka, kyoko, homura]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Train dedicated AI
+        env:
+          CHARACTER: ${{ matrix.character }}
+        run: node tools/train-dedicated-character.mjs
