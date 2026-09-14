@@ -147,45 +147,45 @@ export class GameEngine extends NagisaGameEngine {
     this.beginChainWindow(playerIndex);
   }
 
-  _homuraExtraWitchAvailable(playerIndex, cardId = null) {
-    const marker = this.state.homuraExtraWitchSummon;
+  _homuraExtraMonsterAvailable(playerIndex, cardId = null) {
+    const marker = this.state.homuraExtraMonsterSummon;
     if (!marker || marker.player !== playerIndex || marker.turn !== this.state.turn) return false;
     if (this.state.phase !== PHASES.BATTLE_START || this.state.pendingDecision) return false;
     if (this.state.activePlayer !== playerIndex || this.state.priorityPlayer !== playerIndex) return false;
     const player = this.player(playerIndex);
     if (!player.field.includes(null)) return false;
-    if (cardId === null) return player.hand.some(card => card.type === CARD_TYPES.WITCH);
-    return player.hand.some(card => card.id === cardId && card.type === CARD_TYPES.WITCH);
+    if (cardId === null) return player.hand.some(isMonster);
+    return player.hand.some(card => card.id === cardId && isMonster(card));
   }
 
   canSummon(playerIndex, cardId) {
-    if (this._homuraExtraWitchAvailable(playerIndex, cardId)) return true;
+    if (this._homuraExtraMonsterAvailable(playerIndex, cardId)) return true;
     return super.canSummon(playerIndex, cardId);
   }
 
   validTributeSets(playerIndex, witchCard) {
-    if (witchCard?.type === CARD_TYPES.WITCH && this._homuraExtraWitchAvailable(playerIndex, witchCard.id)) {
+    if (witchCard?.type === CARD_TYPES.WITCH && this._homuraExtraMonsterAvailable(playerIndex, witchCard.id)) {
       return [{ slots: [], handIds: [], total: 0, homuraFree: true }];
     }
     return super.validTributeSets(playerIndex, witchCard);
   }
 
   summon(playerIndex, cardId, tributeRefs = []) {
-    if (!this._homuraExtraWitchAvailable(playerIndex, cardId)) {
+    if (!this._homuraExtraMonsterAvailable(playerIndex, cardId)) {
       return super.summon(playerIndex, cardId, tributeRefs);
     }
 
     this.ensurePriority(playerIndex);
     if (tributeRefs.length) throw new Error('ほむらの追加召喚に生贄は必要ありません。');
     const player = this.player(playerIndex);
-    const handIndex = player.hand.findIndex(card => card.id === cardId && card.type === CARD_TYPES.WITCH);
+    const handIndex = player.hand.findIndex(card => card.id === cardId && isMonster(card));
     const destination = player.field.indexOf(null);
     if (handIndex < 0 || destination < 0) throw new Error('ほむらの追加召喚は行えません。');
 
     const [summoned] = player.hand.splice(handIndex, 1);
     player.field[destination] = summoned;
     summoned.attackedTurn = null;
-    this.state.homuraExtraWitchSummon = null;
+    this.state.homuraExtraMonsterSummon = null;
     this.emit('summon', {
       player: playerIndex,
       slot: destination,
@@ -203,9 +203,9 @@ export class GameEngine extends NagisaGameEngine {
     const isHomura = this.player(playerIndex).character?.id === 'homura';
     const result = super.activateSpecial(playerIndex);
     if (isHomura && this.state.phase !== PHASES.GAME_OVER) {
-      this.state.homuraExtraWitchSummon = { player: playerIndex, turn: this.state.turn };
-      if (this._homuraExtraWitchAvailable(playerIndex)) {
-        this.log(`${this.player(playerIndex).name}は戦闘前に手札の魔女1体を生贄なしで追加召喚できる`);
+      this.state.homuraExtraMonsterSummon = { player: playerIndex, turn: this.state.turn };
+      if (this._homuraExtraMonsterAvailable(playerIndex)) {
+        this.log(`${this.player(playerIndex).name}は戦闘前に手札の使い魔・魔女1体を生贄なしで追加召喚できる`);
       }
     }
     return result;
@@ -213,51 +213,16 @@ export class GameEngine extends NagisaGameEngine {
 
   continueBattlePhase(playerIndex) {
     const result = super.continueBattlePhase(playerIndex);
-    const marker = this.state.homuraExtraWitchSummon;
-    if (marker?.player === playerIndex && marker.turn === this.state.turn) this.state.homuraExtraWitchSummon = null;
+    const marker = this.state.homuraExtraMonsterSummon;
+    if (marker?.player === playerIndex && marker.turn === this.state.turn) this.state.homuraExtraMonsterSummon = null;
     return result;
-  }
-
-  respondChain(playerIndex, cardId = null) {
-    const decision = this.state.pendingDecision;
-    const player = this.player(playerIndex);
-    const card = cardId ? player.hand.find(item => item.id === cardId) : null;
-    const firstOwnTurnBoost = !!card
-      && decision?.type === 'CHAIN_RESPONSE'
-      && decision.player === playerIndex
-      && decision.options.includes(cardId)
-      && player.character?.id === 'homura'
-      && this.state.activePlayer === playerIndex
-      && card.effect === 'boost'
-      && this.state.homuraBoostPassiveTurn !== this.state.turn;
-
-    if (firstOwnTurnBoost) {
-      this.state.homuraBoostPassiveTurn = this.state.turn;
-      this.state.homuraBoostPassiveCardId = card.id;
-    }
-    return super.respondChain(playerIndex, cardId);
   }
 
   resolveMagic(playerIndex, card) {
     if (card?.effect === 'nullifyDamage' && this.state.battle) {
       this.state.battle.shieldPreventsBattleDestruction = true;
     }
-
-    const empowered = card?.effect === 'boost'
-      && this.player(playerIndex).character?.id === 'homura'
-      && this.state.activePlayer === playerIndex
-      && this.state.homuraBoostPassiveTurn === this.state.turn
-      && this.state.homuraBoostPassiveCardId === card.id;
-    if (!empowered) return super.resolveMagic(playerIndex, card);
-
-    const originalValue = card.value ?? 0;
-    card.value = originalValue + 2;
-    this.log(`${this.player(playerIndex).name}のパッシブで${card.name}の上昇値を+2`);
-    try {
-      return super.resolveMagic(playerIndex, card);
-    } finally {
-      card.value = originalValue;
-    }
+    return super.resolveMagic(playerIndex, card);
   }
 
   canActivateMagic(playerIndex, card) {
