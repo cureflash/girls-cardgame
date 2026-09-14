@@ -9,8 +9,8 @@ const boost = (id, value) => ({ id, name:id, type:CARD_TYPES.MAGIC, chainable:tr
 const nullify = (id) => ({ id, name:id, type:CARD_TYPES.MAGIC, chainable:true, effect:'nullifyDamage' });
 const drawTwo = (id) => ({ id, name:id, type:CARD_TYPES.MAGIC, chainable:false, effect:'draw', value:2 });
 const chars = {
-  madoka:{id:'madoka',name:'鹿目まどか'},
-  mami:{id:'mami',name:'巴マミ'},
+  madoka:{id:'madoka',name:'鹿目まどか',openingHandModifier:0},
+  mami:{id:'mami',name:'巴マミ',openingHandModifier:0},
 };
 
 function engine() {
@@ -23,10 +23,10 @@ function engine() {
   });
 }
 
-test('Mami starts with one additional card', () => {
+test('Mami has no legacy opening-hand bonus', () => {
   const e = engine();
   assert.equal(e.player(0).hand.length, 0);
-  assert.equal(e.player(1).hand.length, 1);
+  assert.equal(e.player(1).hand.length, 0);
 });
 
 test('witch tribute consumes a monster after the next turn resets summon allowance', () => {
@@ -189,10 +189,10 @@ function battle(e, player = 1) {
 }
 function passAll(e) { while (e.state.pendingDecision?.type === 'CHAIN_RESPONSE') e.respondChain(e.state.pendingDecision.player); }
 
-test('opening hands are 5/6 and first player does not draw on turn one', () => {
+test('opening hands are 5/5 and first player does not draw on turn one', () => {
   const e = new GameEngine({ players: [{ character: chars.madoka }, { character: chars.mami }], decks: [createMadokaDeck(), createMadokaDeck()] });
-  assert.equal(e.player(0).hand.length,5); assert.equal(e.player(1).hand.length,6);
-  e.endTurn(0); assert.equal(e.player(1).hand.length,7);
+  assert.equal(e.player(0).hand.length,5); assert.equal(e.player(1).hand.length,5);
+  e.endTurn(0); assert.equal(e.player(1).hand.length,6);
   e.endTurn(1); assert.equal(e.player(0).hand.length,6);
 });
 
