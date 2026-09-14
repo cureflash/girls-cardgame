@@ -1,0 +1,19 @@
+name: five-character-browser
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  browser-five-character:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Browser syntax
+        run: node --check src/app.js
+      - name: Five-character rules and deck skins
+        run: node --test tests/five-character-browser.test.mjs tests/opening-hand-balance.test.mjs tests/sayaka.test.mjs tests/kyoko.test.mjs
