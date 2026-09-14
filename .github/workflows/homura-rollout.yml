@@ -1,0 +1,25 @@
+name: homura-rollout
+
+on:
+  push:
+    branches: ['**']
+
+jobs:
+  simulate:
+    if: contains(github.event.head_commit.message, '[homura-rollout]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Homura regression tests
+        run: node --test tests/kyoko.test.mjs tests/sayaka.test.mjs
+      - name: Homura focused rollout
+        run: node br/homura-rollout.mjs --games 100 --samples 4 --min-gain 0.05 --max-actions 300 --output /tmp/homura-rollout.json
+      - name: Upload Homura report
+        uses: actions/upload-artifact@v4
+        with:
+          name: homura-rollout
+          path: /tmp/homura-rollout.json
+          retention-days: 7
