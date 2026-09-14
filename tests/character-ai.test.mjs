@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_GENOME } from '../src/evaluation-ai.js';
 import { baselineGenome, chooseBaselineAction } from '../src/baseline-ai.js';
+import { dedicatedPolicy } from '../src/remaining-ai.js';
 import { GameEngine, PHASES, CARD_TYPES } from '../src/character-engine.js';
 import { CharacterAdapter } from '../src/character-adapter.js';
 import { CHARACTERS, createPlayerDeck, createNpcDeck } from '../src/card-data.js';
@@ -14,6 +15,15 @@ test('browser baseline exposes separate Madoka and Mami policy slots', () => {
   assert.ok(pair.mami);
   assert.equal(baselineGenome('madoka'), pair.madoka);
   assert.equal(baselineGenome('mami'), pair.mami);
+});
+
+test('Sayaka, Kyoko, and Homura expose trained dedicated policy slots', () => {
+  assert.equal(dedicatedPolicy('sayaka').genome.id, 'sayaka-dedicated-v1');
+  assert.equal(dedicatedPolicy('kyoko').genome.id, 'kyoko-dedicated-v1');
+  assert.equal(dedicatedPolicy('homura').genome.id, 'homura-dedicated-v1');
+  assert.equal(dedicatedPolicy('sayaka').threshold, 60);
+  assert.equal(dedicatedPolicy('kyoko').threshold, 140);
+  assert.equal(dedicatedPolicy('homura').threshold, 120);
 });
 
 test('character-bound series evaluates both seat arrangements', () => {
@@ -149,3 +159,32 @@ test('Nagisa baseline AI uses the special when the forced battle value is high a
   assert.equal(damage.player, 1);
   assert.equal(damage.amount, 13);
 });
+
+for (const character of ['sayaka', 'kyoko', 'homura']) {
+  test(`${character} dedicated AI only emits legal actions through a live duel`, () => {
+    let seed = 0x12345678;
+    const rng = () => {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+    const engine = new GameEngine({
+      players: [
+        { id: 'p0', name: CHARACTERS[character].name, character: CHARACTERS[character] },
+        { id: 'p1', name: CHARACTERS.madoka.name, character: CHARACTERS.madoka },
+      ],
+      decks: [createPlayerDeck(character), createNpcDeck('madoka')],
+      rng,
+    });
+    const adapter = new CharacterAdapter(engine);
+    let actions = 0;
+    while (engine.state.phase !== PHASES.GAME_OVER && actions < 250) {
+      const player = adapter.currentPlayer();
+      const legal = adapter.legalActions(player);
+      const action = chooseBaselineAction(adapter, player, rng);
+      assert.ok(legal.includes(action), `${character} action ${action} must be legal at step ${actions}`);
+      adapter.applyAction(action, player);
+      actions++;
+    }
+    assert.ok(actions > 0);
+  });
+}
