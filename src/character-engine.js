@@ -10,6 +10,17 @@ export class GameEngine extends NagisaGameEngine {
     const player = this.player(playerIndex);
     const card = player.field[slot];
     const battleDestruction = reason === 'battle' || reason === 'nagisa-forced-battle';
+    if (card && battleDestruction && this.state.battle?.shieldPreventsBattleDestruction) {
+      this.emit('destroyPrevented', {
+        player: playerIndex,
+        slot,
+        card: { ...card },
+        reason,
+        prevention: 'shield',
+      });
+      this.log(`盾の効果で${card.name}の戦闘破壊を防いだ`);
+      return;
+    }
     if (
       card
       && player.character?.id === 'nagisa'
@@ -136,6 +147,77 @@ export class GameEngine extends NagisaGameEngine {
     this.beginChainWindow(playerIndex);
   }
 
+  _homuraExtraWitchAvailable(playerIndex, cardId = null) {
+    const marker = this.state.homuraExtraWitchSummon;
+    if (!marker || marker.player !== playerIndex || marker.turn !== this.state.turn) return false;
+    if (this.state.phase !== PHASES.BATTLE_START || this.state.pendingDecision) return false;
+    if (this.state.activePlayer !== playerIndex || this.state.priorityPlayer !== playerIndex) return false;
+    const player = this.player(playerIndex);
+    if (!player.field.includes(null)) return false;
+    if (cardId === null) return player.hand.some(card => card.type === CARD_TYPES.WITCH);
+    return player.hand.some(card => card.id === cardId && card.type === CARD_TYPES.WITCH);
+  }
+
+  canSummon(playerIndex, cardId) {
+    if (this._homuraExtraWitchAvailable(playerIndex, cardId)) return true;
+    return super.canSummon(playerIndex, cardId);
+  }
+
+  validTributeSets(playerIndex, witchCard) {
+    if (witchCard?.type === CARD_TYPES.WITCH && this._homuraExtraWitchAvailable(playerIndex, witchCard.id)) {
+      return [{ slots: [], handIds: [], total: 0, homuraFree: true }];
+    }
+    return super.validTributeSets(playerIndex, witchCard);
+  }
+
+  summon(playerIndex, cardId, tributeRefs = []) {
+    if (!this._homuraExtraWitchAvailable(playerIndex, cardId)) {
+      return super.summon(playerIndex, cardId, tributeRefs);
+    }
+
+    this.ensurePriority(playerIndex);
+    if (tributeRefs.length) throw new Error('ほむらの追加召喚に生贄は必要ありません。');
+    const player = this.player(playerIndex);
+    const handIndex = player.hand.findIndex(card => card.id === cardId && card.type === CARD_TYPES.WITCH);
+    const destination = player.field.indexOf(null);
+    if (handIndex < 0 || destination < 0) throw new Error('ほむらの追加召喚は行えません。');
+
+    const [summoned] = player.hand.splice(handIndex, 1);
+    player.field[destination] = summoned;
+    summoned.attackedTurn = null;
+    this.state.homuraExtraWitchSummon = null;
+    this.emit('summon', {
+      player: playerIndex,
+      slot: destination,
+      card: { ...summoned },
+      tributes: [],
+      special: 'homura',
+      free: true,
+    });
+    this.log(`${player.name}の必殺技で${summoned.name}を生贄なしで追加召喚`);
+    this.state.priorityPlayer = playerIndex;
+    return destination;
+  }
+
+  activateSpecial(playerIndex) {
+    const isHomura = this.player(playerIndex).character?.id === 'homura';
+    const result = super.activateSpecial(playerIndex);
+    if (isHomura && this.state.phase !== PHASES.GAME_OVER) {
+      this.state.homuraExtraWitchSummon = { player: playerIndex, turn: this.state.turn };
+      if (this._homuraExtraWitchAvailable(playerIndex)) {
+        this.log(`${this.player(playerIndex).name}は戦闘前に手札の魔女1体を生贄なしで追加召喚できる`);
+      }
+    }
+    return result;
+  }
+
+  continueBattlePhase(playerIndex) {
+    const result = super.continueBattlePhase(playerIndex);
+    const marker = this.state.homuraExtraWitchSummon;
+    if (marker?.player === playerIndex && marker.turn === this.state.turn) this.state.homuraExtraWitchSummon = null;
+    return result;
+  }
+
   respondChain(playerIndex, cardId = null) {
     const decision = this.state.pendingDecision;
     const player = this.player(playerIndex);
@@ -157,6 +239,10 @@ export class GameEngine extends NagisaGameEngine {
   }
 
   resolveMagic(playerIndex, card) {
+    if (card?.effect === 'nullifyDamage' && this.state.battle) {
+      this.state.battle.shieldPreventsBattleDestruction = true;
+    }
+
     const empowered = card?.effect === 'boost'
       && this.player(playerIndex).character?.id === 'homura'
       && this.state.activePlayer === playerIndex
