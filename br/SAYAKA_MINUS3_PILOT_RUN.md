@@ -1,3 +1,3 @@
-# Sayaka minus-3 pilot
+# Sayaka minus-3 focused verification
 
-Run a faster balance probe with the Sayaka passive set to effective witch tribute requirement -3.
+Run 100 games each versus Madoka, Mami, and Kyoko with the Sayaka passive set to effective witch tribute requirement -3.
