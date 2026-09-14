@@ -113,7 +113,7 @@ jobs:
         if: contains(github.event.head_commit.message, '[dual-rollout]')
         uses: actions/upload-artifact@v4
         with:
-          name: dual-rollout-report
+          name: dual-current-meta-report
           path: /tmp/dual-current-meta.json
           retention-days: 7
       - name: Card damage attribution
