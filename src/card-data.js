@@ -37,15 +37,18 @@ const SKINS = {
   },
 };
 
-export function createDeck(characterId, skinId = characterId) {
+export function createDeck(characterId, skinId = characterId, idPrefix = characterId) {
   if (!CHARACTERS[characterId]) throw new Error(`Unknown character: ${characterId}`);
-  const skin = SKINS[skinId];
-  if (!skin) throw new Error(`Unknown deck skin: ${skinId}`);
+  // Keep createDeck safe as an Array.map callback: map passes numeric index/array as extra args.
+  const resolvedSkinId = typeof skinId === 'string' ? skinId : characterId;
+  const resolvedIdPrefix = typeof idPrefix === 'string' ? idPrefix : characterId;
+  const skin = SKINS[resolvedSkinId];
+  if (!skin) throw new Error(`Unknown deck skin: ${resolvedSkinId}`);
   const cards = [];
   const add = (code, data, copies = 1) => {
-    for (let n = 0; n < copies; n++) cards.push({ id: `${characterId}-${cards.length + 1}`, code, ...data });
+    for (let n = 0; n < copies; n++) cards.push({ id: `${resolvedIdPrefix}-${cards.length + 1}`, code, ...data });
   };
-  const assetCharacter = skin.assetCharacter ?? skinId;
+  const assetCharacter = skin.assetCharacter ?? resolvedSkinId;
   const image = file => `./assets/cards/${assetCharacter}/${file}.webp?v=cards-webp1`;
   skin.familiars.forEach(([family, name], familyIndex) => {
     for (const attack of [3, 4, 5]) {
@@ -63,8 +66,8 @@ export function createDeck(characterId, skinId = characterId) {
   return cards; // 30 = familiars 13 + witches 7 + magic 10
 }
 
-export const createPlayerDeck = characterId => createDeck(characterId, 'madoka');
-export const createNpcDeck = characterId => createDeck(characterId, 'mami');
+export const createPlayerDeck = characterId => createDeck(characterId, 'madoka', `player-${characterId}`);
+export const createNpcDeck = characterId => createDeck(characterId, 'mami', `npc-${characterId}`);
 export const createMadokaDeck = () => createDeck('madoka');
 export const createMamiDeck = () => createDeck('mami');
 export const createSayakaDeck = () => createDeck('sayaka');
