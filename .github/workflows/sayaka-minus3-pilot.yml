@@ -1,0 +1,23 @@
+name: sayaka-minus3-pilot
+
+on:
+  push:
+    branches: ['**']
+
+jobs:
+  simulate:
+    if: contains(github.event.head_commit.message, '[sayaka-minus3-pilot]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Sayaka minus-3 pilot rollout
+        run: node br/four-character-rollout.mjs --games 40 --samples 4 --min-gain 0.05 --max-actions 300 --output /tmp/sayaka-minus3-pilot.json
+      - name: Upload Sayaka minus-3 pilot
+        uses: actions/upload-artifact@v4
+        with:
+          name: sayaka-minus3-pilot
+          path: /tmp/sayaka-minus3-pilot.json
+          retention-days: 7
