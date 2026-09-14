@@ -43,8 +43,8 @@ export class GameEngine {
     };
 
     this.state.players.forEach((p, i) => {
-      const bonus = p.character?.id === 'mami' ? 1 : 0;
-      this.draw(i, openingHand + bonus, { log: false });
+      const modifier = Number.isFinite(p.character?.openingHandModifier) ? p.character.openingHandModifier : 0;
+      this.draw(i, Math.max(0, openingHand + modifier), { log: false });
     });
     this.log('デュエル開始');
     this.openPriorityWindow();
