@@ -2,12 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DOPPEL_VOICE_SOURCES, doppelVoiceSource, isSpecialWitchSummon } from '../src/special-summon-intro.js';
 
-const summon = code => ({ type: 'summon', card: { code } });
+const event = (type, code, id = 'player-madoka-1') => ({ type, card: { code, id } });
 
-test('special summon intro targets Walpurgis and Salvation Witch only', () => {
-  assert.equal(isSpecialWitchSummon(summon('witch-walpurgis_13')), true);
-  assert.equal(isSpecialWitchSummon(summon('witch-salvation_13')), true);
-  assert.equal(isSpecialWitchSummon(summon('witch-candy_a_10')), false);
+test('special summon intro targets Walpurgis and Salvation Witch on summon or revive', () => {
+  assert.equal(isSpecialWitchSummon(event('summon', 'witch-walpurgis_13')), true);
+  assert.equal(isSpecialWitchSummon(event('summon', 'witch-salvation_13')), true);
+  assert.equal(isSpecialWitchSummon(event('revive', 'witch-walpurgis_13')), true);
+  assert.equal(isSpecialWitchSummon(event('revive', 'witch-salvation_13')), true);
+  assert.equal(isSpecialWitchSummon(event('summon', 'witch-candy_a_10')), false);
+  assert.equal(isSpecialWitchSummon(event('revive', 'witch-candy_a_10')), false);
   assert.equal(isSpecialWitchSummon({ type: 'attack' }), false);
 });
 
