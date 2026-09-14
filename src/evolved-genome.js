@@ -2,7 +2,7 @@
 export const ACTIVE_GENOMES = Object.freeze({
   "madoka": {
     "format": "girls-cardgame-eval-v1",
-    "rulesVersion": "2026-09-15-homura-plus3-v1",
+    "rulesVersion": "2026-09-13-hand-tributes-shield-ga-v1",
     "generation": 5,
     "id": "madoka-dedicated-homura-plus3-v1",
     "parents": ["madoka-retrain-g7-elite-0"],
@@ -41,7 +41,7 @@ export const ACTIVE_GENOMES = Object.freeze({
   },
   "mami": {
     "format": "girls-cardgame-eval-v1",
-    "rulesVersion": "2026-09-15-homura-plus3-v1",
+    "rulesVersion": "2026-09-13-hand-tributes-shield-ga-v1",
     "generation": 5,
     "id": "mami-dedicated-homura-plus3-v1",
     "parents": ["mami-retrain-g3-elite-0-hall-g3"],
