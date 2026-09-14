@@ -1,0 +1,19 @@
+name: nagisa-ai-diagnosis
+
+on:
+  push:
+    branches:
+      - analysis/nagisa-ai-diagnosis-run
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Diagnose Nagisa AI
+        run: node tools/nagisa-ai-diagnosis.mjs
