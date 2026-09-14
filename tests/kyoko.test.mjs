@@ -58,7 +58,7 @@ test('Kyoko and Homura decks are mechanically identical to the shared deck', () 
   assert.equal(base.length, 30);
   assert.equal(CHARACTERS.kyoko.passive, 'なし');
   assert.equal(CHARACTERS.homura.passive, '自分のターンに最初に使う攻撃力アップ1枚の上昇値を+2');
-  assert.equal(CHARACTERS.homura.special, '発動ターン中、相手はチェーン不可');
+  assert.equal(CHARACTERS.homura.special, '戦闘前に手札の魔女1体を生贄なしで追加召喚可能＋発動ターン中、相手はチェーン不可');
   assert.deepEqual([...new Set(createDeck('kyoko').filter(card => card.type === 'witch').map(card => card.tributeThreshold))].sort((a, b) => a - b), [8, 10, 13]);
   assert.deepEqual([...new Set(createDeck('homura').filter(card => card.type === 'witch').map(card => card.tributeThreshold))].sort((a, b) => a - b), [8, 10, 13]);
 });
