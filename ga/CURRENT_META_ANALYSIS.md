@@ -64,8 +64,44 @@ The planner made 2,680 non-forced decisions and deviated from the current-meta M
 14. use +5 boost: 7
 15. summon ATK 13 witch: 1
 
+## Mutual rollout probe
+
+Both characters were then given the same conservative hidden-information rollout rule on top of the same current-meta generation-99 pair. Candidate rollouts still use the fixed current-meta policies after the candidate action, so this is a mutual one-step policy-improvement probe rather than a recursive exact equilibrium solver.
+
+Configuration:
+
+- games: 100
+- hidden-world samples per non-forced decision: 16
+- max actions: 300
+- minimum accepted gain over each character's current-meta action: 0.05
+- all 100 games terminated normally
+- rollout cutoffs: 0 for both characters
+
+Results:
+
+| Mutual rollout | Wins | Losses | Win rate |
+|---|---:|---:|---:|
+| Madoka | 49 | 51 | 49% |
+| Mami | 51 | 49 | 51% |
+
+Madoka by seat:
+
+- first: 23 / 50 = 46%
+- second: 26 / 50 = 52%
+
+Search activity:
+
+- Madoka: 2,864 non-forced decisions, 828 deviations = 28.91%
+- Mami: 2,827 non-forced decisions, 1,002 deviations = 35.44%
+
+Most common Madoka deviations: end turn (269), enter battle (70), +2 boost (60), summon ATK 4 familiar (56), summon ATK 5 familiar (49), +3 boost (49), summon ATK 3 familiar (46), pass (44), Pluvia Magica (26), shield (26).
+
+Most common Mami deviations: end turn (452), +2 boost (88), enter battle (84), +3 boost (67), summon ATK 3 familiar (45), shield (45), pass (42), summon ATK 4 familiar (36), continue battle (27), summon ATK 8 witch (20).
+
 ## Current interpretation
 
-The current-meta GA still favors Mami when both sides use their evolved one-step evaluation policies, but Madoka has a large exploitable strategy gap against that fixed Mami policy. The rollout planner's gains do **not** primarily come from rushing Salvation Witch or from always firing shields. The dominant pattern is selective tempo/resource management: ending low-value turns, keeping ordinary familiars available, using small boosts precisely, and choosing when to enter or continue battle.
+The 84% Madoka result was largely a best-response exploit against a fixed Mami policy, not evidence that Madoka is intrinsically an 84% favorite. When both characters receive the same hidden-information search capability, the matchup moves to **49% / 51%**, essentially even in this 100-game probe.
 
-This is a practical best response to the current-meta Mami champion, not an exact Nash equilibrium. It does not yet prove that Madoka has an 84% intrinsic matchup against a mathematically optimal Mami player.
+This also changes the strategic interpretation. The strongest pattern found so far is not pure counterplay or boss rushing. Both sides improve mainly by declining low-value continuations, ending turns earlier, preserving ordinary familiars, using small boosts more precisely, and choosing battle timing more selectively. The current-meta GA's 41.75% / 58.25% split therefore contains a substantial policy-quality component in addition to any underlying card/character balance difference.
+
+The next matrix entry to measure is the reverse unilateral best response: rollout Mami against fixed current-meta Madoka. That will complete the 2x2 empirical strategy matrix before attempting a deeper equilibrium approximation.
