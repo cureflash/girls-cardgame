@@ -116,3 +116,13 @@ jobs:
           name: dual-current-meta-report
           path: /tmp/dual-current-meta.json
           retention-days: 7
+      - name: Card damage attribution
+        if: contains(github.event.head_commit.message, '[witch-damage]')
+        run: node br/witch-damage-current-meta.mjs --pair ga/current-meta-analysis-pair.json --games 100 --samples 16 --min-gain 0.05 --max-actions 300 --output /tmp/witch-damage-current-meta.json
+      - name: Upload card damage attribution
+        if: contains(github.event.head_commit.message, '[witch-damage]')
+        uses: actions/upload-artifact@v4
+        with:
+          name: witch-damage-current-meta
+          path: /tmp/witch-damage-current-meta.json
+          retention-days: 7
