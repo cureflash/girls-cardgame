@@ -120,7 +120,7 @@ test('shield also preserves the non-shield side when the shield user would win',
   assert.equal(e.state.battlePhaseEnded, true);
 });
 
-test('Homura attack-up cards use their printed value without the removed +2 passive', () => {
+test('Homura attack-up cards always gain +2 over their printed value', () => {
   const e = makeHomuraEngine();
   e.player(1).field[0] = familiar('homura', 3);
   e.player(0).field[0] = familiar('defender', 6);
@@ -131,7 +131,7 @@ test('Homura attack-up cards use their printed value without the removed +2 pass
   e.respondChain(1, 'boost');
 
   const battle = e.state.events.filter(event => event.type === 'battleEnd').at(-1);
-  assert.equal(battle?.attackValue, 5);
-  assert.equal(e.player(1).field[0], null);
-  assert.equal(e.player(0).field[0]?.id, 'defender');
+  assert.equal(battle?.attackValue, 7);
+  assert.equal(e.player(1).field[0]?.id, 'homura');
+  assert.equal(e.player(0).field[0], null);
 });

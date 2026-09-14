@@ -57,8 +57,8 @@ test('Kyoko and Homura decks are mechanically identical to the shared deck', () 
   for (const character of ['mami', 'sayaka', 'kyoko', 'homura']) assert.deepEqual(mechanicalDeck(character), base);
   assert.equal(base.length, 30);
   assert.equal(CHARACTERS.kyoko.passive, 'なし');
-  assert.equal(CHARACTERS.homura.passive, '初期手札が1枚多い');
-  assert.equal(CHARACTERS.homura.special, '戦闘前に手札の使い魔・魔女1体を生贄なしで追加召喚可能＋発動ターン中、相手はチェーン不可');
+  assert.equal(CHARACTERS.homura.passive, '初期手札が1枚多い＋攻撃アップ魔法の効果量を常に＋2');
+  assert.equal(CHARACTERS.homura.special, '発動ターン中、相手はチェーン不可');
   assert.deepEqual([...new Set(createDeck('kyoko').filter(card => card.type === 'witch').map(card => card.tributeThreshold))].sort((a, b) => a - b), [8, 10, 13]);
   assert.deepEqual([...new Set(createDeck('homura').filter(card => card.type === 'witch').map(card => card.tributeThreshold))].sort((a, b) => a - b), [8, 10, 13]);
 });
