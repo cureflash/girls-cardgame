@@ -1,0 +1,18 @@
+.player[data-character="madoka"]{--portrait-image:url("./assets/characters/madoka.webp")}
+.player[data-character="mami"]{--portrait-image:url("./assets/characters/mami.webp")}
+.player[data-character="sayaka"]{--portrait-image:url("./assets/characters/sayaka.webp")}
+.player[data-character="kyoko"]{--portrait-image:url("./assets/characters/kyoko.webp")}
+.player[data-character="homura"]{--portrait-image:url("./assets/characters/homura.webp")}
+
+#top-player,#bottom-player{display:grid;grid-template-columns:150px minmax(0,1fr);column-gap:14px}
+#top-player{grid-template-areas:"head head" "portrait hidden" "portrait field"}
+#bottom-player{grid-template-areas:"head head" "portrait field" "handhead handhead" "hand hand"}
+#top-player::before,#bottom-player::before{content:"";grid-area:portrait;width:132px;height:132px;align-self:center;justify-self:center;border:1px solid var(--accent);border-radius:18px;background-color:#161620;background-image:var(--portrait-image);background-size:cover;background-position:center;background-repeat:no-repeat;box-shadow:0 8px 24px #0007,0 0 0 3px #ffffff08;pointer-events:none}
+#top-player .player-head,#bottom-player .player-head{grid-area:head}
+#top-player .hidden-hand{grid-area:hidden}
+#top-player .field,#bottom-player .field{grid-area:field;width:100%}
+#bottom-player .hand-heading{grid-area:handhead}
+#bottom-player .hand{grid-area:hand}
+
+@media(max-width:1100px){#top-player,#bottom-player{grid-template-columns:112px minmax(0,1fr);column-gap:8px}#top-player::before,#bottom-player::before{width:96px;height:96px;border-radius:14px}}
+@media(max-width:760px){#top-player,#bottom-player{grid-template-columns:72px minmax(0,1fr);column-gap:6px}#top-player::before,#bottom-player::before{width:62px;height:62px;border-radius:11px}}
