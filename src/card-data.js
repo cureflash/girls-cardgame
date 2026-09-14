@@ -3,7 +3,7 @@ import { CARD_TYPES } from './game-engine.js';
 export const CHARACTERS = {
   madoka: { id: 'madoka', name: '鹿目まどか', passive: '戦闘ダメージを1軽減', special: 'プルウィア☆マギカ', image: './assets/characters/madoka.webp' },
   mami: { id: 'mami', name: '巴マミ', passive: '初期手札が1枚多い', special: 'ティロ・フィナーレ', image: './assets/characters/mami.webp' },
-  sayaka: { id: 'sayaka', name: '美樹さやか', passive: '魔女召喚の生贄に必要な攻撃力合計を1減らす', special: '墓地の任意のカード3枚をデッキに戻してシャッフル', image: null },
+  sayaka: { id: 'sayaka', name: '美樹さやか', passive: '魔女召喚の生贄に必要な攻撃力合計を3減らす', special: '墓地の任意のカード3枚をデッキに戻してシャッフル', image: null },
   kyoko: { id: 'kyoko', name: '佐倉杏子', passive: 'なし', special: '相手の使い魔・魔女1体を生贄にして魔女召喚', image: null },
 };
 const SKINS = {
