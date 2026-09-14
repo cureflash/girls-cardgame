@@ -94,11 +94,10 @@ function homuraSpecialScore(engine, playerIndex) {
   const self = engine.player(playerIndex);
   const opp = engine.player(engine.opponent(playerIndex));
   const fieldAttackers = self.field.filter(card => isMonster(card) && card.attackedTurn !== engine.state.turn);
-  const extraWitch = self.field.includes(null)
-    ? self.hand.filter(card => card.type === CARD_TYPES.WITCH)
-      .sort((a, b) => (b.attack ?? 0) - (a.attack ?? 0))[0] ?? null
+  const extraMonster = self.field.includes(null)
+    ? self.hand.filter(isMonster).sort((a, b) => (b.attack ?? 0) - (a.attack ?? 0))[0] ?? null
     : null;
-  const attackers = extraWitch ? [...fieldAttackers, extraWitch] : fieldAttackers;
+  const attackers = extraMonster ? [...fieldAttackers, extraMonster] : fieldAttackers;
   if (!attackers.length) return -Infinity;
 
   const maxAttack = Math.max(...attackers.map(card => card.attack ?? 0));
@@ -116,7 +115,7 @@ function homuraSpecialScore(engine, playerIndex) {
     + maxBoost * 9
     + Math.max(0, bestVisibleSwing) * 7
     + opp.hand.length * 5
-    + (extraWitch ? 35 + (extraWitch.attack ?? 0) * 8 : 0);
+    + (extraMonster ? 30 + (extraMonster.attack ?? 0) * 8 + (extraMonster.type === CARD_TYPES.WITCH ? 15 : 0) : 0);
 }
 
 function specialScore(character, engine, playerIndex) {
@@ -172,8 +171,8 @@ function choosePending(character, adapter, playerIndex, legal) {
   return null;
 }
 
-function chooseHomuraExtraWitch(adapter, playerIndex, legal) {
-  const marker = adapter.engine.state.homuraExtraWitchSummon;
+function chooseHomuraExtraMonster(adapter, playerIndex, legal) {
+  const marker = adapter.engine.state.homuraExtraMonsterSummon;
   if (!marker || marker.player !== playerIndex || marker.turn !== adapter.engine.state.turn) return null;
   const hand = adapter.engine.player(playerIndex).hand;
   let best = null;
@@ -183,8 +182,8 @@ function chooseHomuraExtraWitch(adapter, playerIndex, legal) {
     const handIndex = Math.floor(offset / RL_LIMITS.TRIBUTE_MASKS);
     const tributeMask = offset % RL_LIMITS.TRIBUTE_MASKS;
     const card = hand[handIndex];
-    if (tributeMask !== 0 || card?.type !== CARD_TYPES.WITCH) continue;
-    const score = card.attack ?? 0;
+    if (tributeMask !== 0 || !isMonster(card)) continue;
+    const score = (card.attack ?? 0) + (card.type === CARD_TYPES.WITCH ? 2 : 0);
     if (!best || score > best.score) best = { action, score };
   }
   return best?.action ?? null;
@@ -203,8 +202,8 @@ export function chooseRemainingCharacterAction(adapter, playerIndex = adapter.cu
   if (pending !== null) return pending;
 
   if (character === 'homura') {
-    const freeWitch = chooseHomuraExtraWitch(adapter, playerIndex, legal);
-    if (freeWitch !== null) return freeWitch;
+    const freeMonster = chooseHomuraExtraMonster(adapter, playerIndex, legal);
+    if (freeMonster !== null) return freeMonster;
   }
 
   if (legal.includes(ACTIONS.SPECIAL)) {
