@@ -3,6 +3,31 @@ import { GameEngine as BaseGameEngine, PHASES, CARD_TYPES } from './game-engine.
 export { PHASES, CARD_TYPES };
 
 export class GameEngine extends BaseGameEngine {
+  _effectiveMonsterAttack(playerIndex, card) {
+    const base = card?.attack ?? 0;
+    if (!card || ![CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(card.type)) return base;
+    if (this.player(playerIndex).character?.id === 'homura' && !this._homuraSummonUsesBoostedCards) return base + 1;
+    return base;
+  }
+
+  _handTributePlans(playerIndex, witchCard) {
+    const p = this.player(playerIndex);
+    if (p.character?.id !== 'homura') return super._handTributePlans(playerIndex, witchCard);
+    const familiars = p.hand.filter(card => card.id !== witchCard.id && card.type === CARD_TYPES.FAMILIAR);
+    const plans = new Map([[0, []]]);
+    for (const card of familiars) {
+      for (const [sum, ids] of [...plans.entries()]) {
+        const next = sum + this._effectiveMonsterAttack(playerIndex, card);
+        const candidate = [...ids, card.id];
+        const current = plans.get(next);
+        if (!current || candidate.length < current.length) plans.set(next, candidate);
+      }
+    }
+    return [...plans.entries()]
+      .map(([total, handIds]) => ({ total, handIds }))
+      .sort((a, b) => a.total - b.total || a.handIds.length - b.handIds.length);
+  }
+
   _sayakaEffectiveThreshold(playerIndex, witchCard) {
     const base = witchCard?.tributeThreshold ?? 0;
     return this.player(playerIndex).character?.id === 'sayaka' && witchCard?.type === CARD_TYPES.WITCH
@@ -11,6 +36,36 @@ export class GameEngine extends BaseGameEngine {
   }
 
   validTributeSets(playerIndex, witchCard) {
+    const p = this.player(playerIndex);
+    if (p.character?.id === 'homura') {
+      const fieldCards = p.field
+        .map((card, slot) => ({ card, slot }))
+        .filter(item => item.card && [CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(item.card.type));
+      const handPlans = this._handTributePlans(playerIndex, witchCard);
+      const threshold = witchCard?.tributeThreshold ?? 0;
+      const results = [];
+      const n = fieldCards.length;
+      for (let mask = 0; mask < (1 << n); mask++) {
+        const slots = [];
+        let fieldTotal = 0;
+        for (let i = 0; i < n; i++) {
+          if (mask & (1 << i)) {
+            slots.push(fieldCards[i].slot);
+            fieldTotal += this._effectiveMonsterAttack(playerIndex, fieldCards[i].card);
+          }
+        }
+        if (!p.field.includes(null) && slots.length === 0) continue;
+        const needed = Math.max(0, threshold - fieldTotal);
+        const handPlan = handPlans.find(plan => plan.total >= needed);
+        if (!handPlan) continue;
+        if (slots.length === 0 && handPlan.handIds.length === 0) continue;
+        results.push({ slots, handIds: handPlan.handIds, total: fieldTotal + handPlan.total });
+      }
+      return results.sort((a, b) => a.total - b.total
+        || (a.slots.length + a.handIds.length) - (b.slots.length + b.handIds.length)
+        || a.slots.length - b.slots.length);
+    }
+
     if (this._sayakaSummonUsesDiscountedCard) return super.validTributeSets(playerIndex, witchCard);
     const threshold = this._sayakaEffectiveThreshold(playerIndex, witchCard);
     if (threshold === (witchCard?.tributeThreshold ?? 0)) return super.validTributeSets(playerIndex, witchCard);
@@ -20,25 +75,62 @@ export class GameEngine extends BaseGameEngine {
   summon(playerIndex, cardId, tributeRefs = []) {
     const p = this.player(playerIndex);
     const card = p.hand.find(item => item.id === cardId);
-    if (p.character?.id !== 'sayaka' || card?.type !== CARD_TYPES.WITCH) {
-      return super.summon(playerIndex, cardId, tributeRefs);
-    }
-
-    const originalThreshold = card.tributeThreshold ?? 0;
-    card.tributeThreshold = this._sayakaEffectiveThreshold(playerIndex, card);
-    this._sayakaSummonUsesDiscountedCard = true;
-    try {
-      return super.summon(playerIndex, cardId, tributeRefs);
-    } finally {
-      this._sayakaSummonUsesDiscountedCard = false;
-      card.tributeThreshold = originalThreshold;
-      for (let i = this.state.events.length - 1; i >= 0; i--) {
-        const event = this.state.events[i];
-        if (event.card?.id === cardId) {
-          event.card.tributeThreshold = originalThreshold;
-          break;
+    if (p.character?.id === 'sayaka' && card?.type === CARD_TYPES.WITCH) {
+      const originalThreshold = card.tributeThreshold ?? 0;
+      card.tributeThreshold = this._sayakaEffectiveThreshold(playerIndex, card);
+      this._sayakaSummonUsesDiscountedCard = true;
+      try {
+        return super.summon(playerIndex, cardId, tributeRefs);
+      } finally {
+        this._sayakaSummonUsesDiscountedCard = false;
+        card.tributeThreshold = originalThreshold;
+        for (let i = this.state.events.length - 1; i >= 0; i--) {
+          const event = this.state.events[i];
+          if (event.card?.id === cardId) {
+            event.card.tributeThreshold = originalThreshold;
+            break;
+          }
         }
       }
+    }
+
+    if (p.character?.id === 'homura' && card?.type === CARD_TYPES.WITCH) {
+      const boosted = [
+        ...p.field.filter(item => item && [CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(item.type)),
+        ...p.hand.filter(item => item.id !== cardId && item.type === CARD_TYPES.FAMILIAR),
+      ];
+      for (const item of boosted) item.attack = (item.attack ?? 0) + 1;
+      this._homuraSummonUsesBoostedCards = true;
+      try {
+        return super.summon(playerIndex, cardId, tributeRefs);
+      } finally {
+        this._homuraSummonUsesBoostedCards = false;
+        for (const item of boosted) item.attack = Math.max(0, (item.attack ?? 0) - 1);
+      }
+    }
+
+    return super.summon(playerIndex, cardId, tributeRefs);
+  }
+
+  attack(playerIndex, attackerSlot, targetSlot = null) {
+    const attacker = this.player(playerIndex).field[attackerSlot];
+    const opponentIndex = this.opponent(playerIndex);
+    const defender = targetSlot === null ? null : this.player(opponentIndex).field[targetSlot];
+    const boosted = [];
+    if (attacker && this.player(playerIndex).character?.id === 'homura'
+      && [CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(attacker.type)) {
+      attacker.attack = (attacker.attack ?? 0) + 1;
+      boosted.push(attacker);
+    }
+    if (defender && this.player(opponentIndex).character?.id === 'homura'
+      && [CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(defender.type)) {
+      defender.attack = (defender.attack ?? 0) + 1;
+      boosted.push(defender);
+    }
+    try {
+      return super.attack(playerIndex, attackerSlot, targetSlot);
+    } finally {
+      for (const item of boosted) item.attack = Math.max(0, (item.attack ?? 0) - 1);
     }
   }
 
@@ -83,10 +175,11 @@ export class GameEngine extends BaseGameEngine {
   validKyokoTributeSets(playerIndex, witchCard, opponentSlot) {
     const p = this.player(playerIndex);
     if (p.character?.id !== 'kyoko' || witchCard?.type !== CARD_TYPES.WITCH) return [];
-    const opponent = this.player(this.opponent(playerIndex));
+    const opponentIndex = this.opponent(playerIndex);
+    const opponent = this.player(opponentIndex);
     const target = opponent.field[opponentSlot];
     if (!target || ![CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(target.type)) return [];
-    return this._kyokoOwnTributeSets(playerIndex, witchCard, target.attack ?? 0);
+    return this._kyokoOwnTributeSets(playerIndex, witchCard, this._effectiveMonsterAttack(opponentIndex, target));
   }
 
   kyokoSpecialTargets(playerIndex) {
@@ -118,6 +211,7 @@ export class GameEngine extends BaseGameEngine {
       if (p.specialUsed) return false;
       return this.kyokoSpecialTargets(playerIndex).length > 0;
     }
+    if (p.character?.id === 'homura') return false;
     return super.canUseSpecial(playerIndex);
   }
 
@@ -151,6 +245,7 @@ export class GameEngine extends BaseGameEngine {
       this.log(`${p.name}の必殺技 — 相手の使い魔・魔女1体を生贄に選択`);
       return;
     }
+    if (p.character?.id === 'homura') throw new Error('Special move cannot be activated.');
     return super.activateSpecial(playerIndex);
   }
 
@@ -219,6 +314,7 @@ export class GameEngine extends BaseGameEngine {
         && candidate.slots.every((slot, index) => slot === requested[index]));
     if (!plan) throw new Error('Selected Kyoko tribute combination is invalid.');
 
+    const opponentTributeValue = this._effectiveMonsterAttack(d.opponentPlayer, target);
     opponent.graveyard.push(target);
     opponent.field[d.opponentSlot] = null;
     this.emit('opponentTribute', {
@@ -226,7 +322,7 @@ export class GameEngine extends BaseGameEngine {
       opponent: d.opponentPlayer,
       slot: d.opponentSlot,
       card: { ...target },
-      value: target.attack ?? 0,
+      value: opponentTributeValue,
     });
 
     for (const slot of plan.slots) {
