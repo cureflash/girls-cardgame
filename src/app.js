@@ -1,4 +1,4 @@
-import { GameEngine, CARD_TYPES, PHASES } from './character-engine.js?v=nagisa2';
+import { GameEngine, CARD_TYPES, PHASES } from './character-engine.js?v=homura3';
 import { CHARACTERS, createPlayerDeck, createNpcDeck } from './card-data.js';
 import { CharacterAdapter } from './character-adapter.js?v=nagisa2';
 import { RULES_VERSION } from './rl-adapter.js';
@@ -17,7 +17,7 @@ function description(card) {
   if (card.type === CARD_TYPES.FAMILIAR) return `攻撃力 ${card.attack}。生贄なしで召喚できます。`;
   if (card.effect === 'draw') return 'メインフェイズに2枚ドロー。山札が0枚になると敗北します。';
   if (card.effect === 'boost') return `戦闘中の自分の使い魔・魔女の攻撃力を＋${card.value}。この戦闘のみ有効。`;
-  return 'この戦闘で自分の使い魔・魔女は戦闘では破壊されず、自分が受ける戦闘ダメージは0になります。発動した時点でチェーンを終了し、この戦闘の解決後にバトルフェイズを終了します。';
+  return 'この戦闘では双方の使い魔・魔女は戦闘では破壊されず、自分が受ける戦闘ダメージは0になります。発動した時点でチェーンを終了し、この戦闘の解決後にバトルフェイズを終了します。';
 }
 
 function clear() { selection = null; tributes = []; attacker = null; target = null; }
@@ -232,7 +232,14 @@ function renderPlayer(index, selector) {
   root.append(field);
   if (selector === '#bottom-player') {
     const info = node('div', 'hand-heading');
-    info.append(node('b', '', '手札'), node('span', '', p.summonedThisTurn && index === s.activePlayer ? 'このターンの召喚は使用済み' : '召喚は1ターンに1体'), node('span', '', `必殺技：${p.specialUsed ? '使用済み' : '未使用'}`));
+    const extraHomuraSummon = p.character.id === 'homura'
+      && s.homuraExtraWitchSummon?.player === index
+      && s.homuraExtraWitchSummon?.turn === s.turn;
+    info.append(
+      node('b', '', '手札'),
+      node('span', '', extraHomuraSummon ? '必殺技で魔女1体を追加召喚可能' : p.summonedThisTurn && index === s.activePlayer ? 'このターンの召喚は使用済み' : '召喚は1ターンに1体'),
+      node('span', '', `必殺技：${p.specialUsed ? '使用済み' : '未使用'}`),
+    );
     const hand = node('div', 'hand'); p.hand.forEach(card => hand.append(cardButton(card, index, 'hand')));
     root.append(info, hand);
   }
@@ -271,15 +278,32 @@ function renderActions() {
     if (s.phase === PHASES.BATTLE_START) {
       const self = engine.player(p);
       const homuraLockActive = self.character.id === 'homura' && self.specialUsed && s.homuraChainLockTurn === s.turn;
-      if (homuraLockActive) hint = '必殺技発動中：このターンは相手だけチェーン不可。ほむら側の強化魔法は使用できます。';
+      const homuraExtraSummon = self.character.id === 'homura'
+        && s.homuraExtraWitchSummon?.player === p
+        && s.homuraExtraWitchSummon?.turn === s.turn;
+      if (homuraExtraSummon && card?.type === CARD_TYPES.WITCH) hint = `${card.name}を生贄なしで追加召喚できます。使わない場合はそのままバトルを開始してください。`;
+      else if (homuraExtraSummon) hint = '必殺技発動中：手札の魔女1体を生贄なしで追加召喚できます。使わない場合はそのままバトル開始できます。';
+      else if (homuraLockActive) hint = '必殺技発動中：このターンは相手だけチェーン不可。ほむら側の強化魔法は使用できます。';
       else if (self.specialUsed) hint = '必殺技は使用済みです。バトルを始めましょう。';
       else if (self.character.id === 'nagisa') hint = '必殺技で自分・相手の全モンスターを何体でも順番に操作できます。相手の場が空になるまで直接攻撃はできません。';
       else if (specialEndsTurn(self.character.id)) hint = '必殺技を使うと、このターンのバトルはスキップしてターン終了します。';
       else hint = '必殺技を使っても、このままバトルへ進めます。相手はこのターン中チェーンできません。';
-      root.append(
+      const battleStartActions = [
         button(self.character.special, () => perform(() => engine.activateSpecial(p), { type: 'special', name: self.character.special }), 'special', !engine.canUseSpecial(p)),
-        button('バトル開始', () => perform(() => engine.continueBattlePhase(p), { type: 'continue-battle' })),
-      );
+      ];
+      if (homuraExtraSummon && card?.type === CARD_TYPES.WITCH) {
+        battleStartActions.push(button(
+          '魔女を生贄なしで追加召喚',
+          () => perform(
+            () => engine.summon(p, card.id, []),
+            { type: 'homura-extra-witch-summon', cardId: card.id, cardName: card.name },
+          ),
+          'primary',
+          !engine.canSummon(p, card.id),
+        ));
+      }
+      battleStartActions.push(button('バトル開始', () => perform(() => engine.continueBattlePhase(p), { type: 'continue-battle' })));
+      root.append(...battleStartActions);
     }
     if (s.phase === PHASES.BATTLE) {
       if (s.battlePhaseEnded) hint = '盾の効果でバトルフェイズは終了しました。ターンを終了してください。';
