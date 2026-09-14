@@ -46,6 +46,6 @@ test('Kyoko has no passive and keeps her special', () => {
 test('Homura starts with one extra card and advertises her expanded special', () => {
   const homura = start('homura');
   assert.equal(homura.player(0).hand.length, 6);
-  assert.equal(homura.player(0).character.passive, '自分のターンに最初に使う攻撃力アップ1枚の上昇値を+2');
-  assert.equal(homura.player(0).character.special, '戦闘前に手札の魔女1体を生贄なしで追加召喚可能＋発動ターン中、相手はチェーン不可');
+  assert.equal(homura.player(0).character.passive, '初期手札が1枚多い');
+  assert.equal(homura.player(0).character.special, '戦闘前に手札の使い魔・魔女1体を生贄なしで追加召喚可能＋発動ターン中、相手はチェーン不可');
 });
