@@ -136,3 +136,13 @@ jobs:
           name: three-character-round-robin
           path: /tmp/three-character-round-robin.json
           retention-days: 7
+      - name: Three-character mutual rollout
+        if: contains(github.event.head_commit.message, '[three-rollout]')
+        run: node br/three-character-rollout.mjs --games 100 --samples 8 --min-gain 0.05 --max-actions 300 --output /tmp/three-character-rollout.json
+      - name: Upload three-character mutual rollout
+        if: contains(github.event.head_commit.message, '[three-rollout]')
+        uses: actions/upload-artifact@v4
+        with:
+          name: three-character-rollout
+          path: /tmp/three-character-rollout.json
+          retention-days: 7
