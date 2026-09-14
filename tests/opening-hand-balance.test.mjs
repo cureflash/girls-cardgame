@@ -17,7 +17,7 @@ test('current opening-hand skills are applied exactly', () => {
     mami: 4,
     sayaka: 5,
     kyoko: 5,
-    homura: 6,
+    homura: 5,
   };
 
   for (const [id, handSize] of Object.entries(expected)) {
@@ -43,9 +43,9 @@ test('Kyoko has no passive and keeps her special', () => {
   assert.equal(kyoko.player(0).character.special, '相手の使い魔・魔女1体を生贄にして魔女召喚');
 });
 
-test('Homura starts with one extra card, boosts attack-up magic, and has chain-lock-only special', () => {
+test('Homura has a normal opening hand, boosts attack-up magic, and has chain-lock-only special', () => {
   const homura = start('homura');
-  assert.equal(homura.player(0).hand.length, 6);
-  assert.equal(homura.player(0).character.passive, '初期手札が1枚多い＋攻撃アップ魔法の効果量を常に＋2');
+  assert.equal(homura.player(0).hand.length, 5);
+  assert.equal(homura.player(0).character.passive, '攻撃アップ魔法の効果量を常に＋2');
   assert.equal(homura.player(0).character.special, '発動ターン中、相手はチェーン不可');
 });
