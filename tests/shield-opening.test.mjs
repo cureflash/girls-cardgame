@@ -60,7 +60,7 @@ test('attacking side cannot use shield as the first chain action', () => {
   assert.equal(e.state.battlePhaseEnded, false);
 });
 
-test('defending side can still use shield on its first response', () => {
+test('defending side shield preserves both monsters on an equal battle', () => {
   const e = makeEngine();
   e.player(1).field[0] = familiar('attacker', 8);
   e.player(0).field[0] = familiar('defender', 8);
@@ -74,7 +74,7 @@ test('defending side can still use shield on its first response', () => {
   assert.deepEqual(e.state.pendingDecision?.options, ['defender-shield']);
 
   e.respondChain(0, 'defender-shield');
-  assert.equal(e.player(1).field[0], null);
+  assert.equal(e.player(1).field[0]?.id, 'attacker');
   assert.equal(e.player(0).field[0]?.id, 'defender');
   assert.equal(e.state.battlePhaseEnded, true);
 });
@@ -96,6 +96,25 @@ test('attacking side may use shield after another chain card has started the cha
   assert.deepEqual(e.state.pendingDecision?.options, ['later-shield']);
 
   e.respondChain(1, 'later-shield');
+  assert.equal(e.player(1).field[0]?.id, 'attacker');
+  assert.equal(e.player(0).field[0]?.id, 'defender');
+  assert.equal(e.state.battlePhaseEnded, true);
+});
+
+test('shield also preserves the non-shield side when the shield user would win', () => {
+  const e = makeEngine();
+  e.player(1).field[0] = familiar('attacker', 8);
+  e.player(0).field[0] = familiar('defender', 5);
+  e.player(1).hand = [shield('attacker-shield')];
+  e.player(0).hand = [boost('defender-boost', 1)];
+
+  enterBattleAsPlayer1(e);
+  e.attack(1, 0, 0);
+  assert.equal(e.state.pendingDecision?.player, 0);
+  e.respondChain(0, 'defender-boost');
+  assert.equal(e.state.pendingDecision?.player, 1);
+  e.respondChain(1, 'attacker-shield');
+
   assert.equal(e.player(1).field[0]?.id, 'attacker');
   assert.equal(e.player(0).field[0]?.id, 'defender');
   assert.equal(e.state.battlePhaseEnded, true);
