@@ -134,6 +134,20 @@ export class GameEngine extends BaseGameEngine {
     }
   }
 
+  _homuraChainLocked(playerIndex) {
+    return this.state.homuraChainLockTurn === this.state.turn
+      && this.state.homuraChainLockPlayer === playerIndex;
+  }
+
+  beginChainWindow(playerIndex) {
+    if (!this._homuraChainLocked(playerIndex)) return super.beginChainWindow(playerIndex);
+    this.setPhase(PHASES.CHAIN);
+    this.state.priorityPlayer = playerIndex;
+    this.state.chainPassCount = (this.state.chainPassCount ?? 0) + 1;
+    if (this.state.chainPassCount >= 2) this.resolveChainAndBattle();
+    else this.beginChainWindow(this.opponent(playerIndex));
+  }
+
   _kyokoOwnTributeSets(playerIndex, witchCard, opponentAttack) {
     const p = this.player(playerIndex);
     const fieldCards = p.field
@@ -153,7 +167,6 @@ export class GameEngine extends BaseGameEngine {
           fieldTotal += fieldCards[i].card.attack ?? 0;
         }
       }
-      // The special still needs an empty zone for the summoned witch.
       if (!p.field.includes(null) && slots.length === 0) continue;
       const needed = Math.max(0, threshold - opponentAttack - fieldTotal);
       const handPlan = handPlans.find(plan => plan.total >= needed);
@@ -211,7 +224,11 @@ export class GameEngine extends BaseGameEngine {
       if (p.specialUsed) return false;
       return this.kyokoSpecialTargets(playerIndex).length > 0;
     }
-    if (p.character?.id === 'homura') return false;
+    if (p.character?.id === 'homura') {
+      if (this.state.phase !== PHASES.BATTLE_START || this.state.pendingDecision) return false;
+      if (this.state.activePlayer !== playerIndex || this.state.priorityPlayer !== playerIndex) return false;
+      return !p.specialUsed;
+    }
     return super.canUseSpecial(playerIndex);
   }
 
@@ -245,7 +262,16 @@ export class GameEngine extends BaseGameEngine {
       this.log(`${p.name}の必殺技 — 相手の使い魔・魔女1体を生贄に選択`);
       return;
     }
-    if (p.character?.id === 'homura') throw new Error('Special move cannot be activated.');
+    if (p.character?.id === 'homura') {
+      this.ensurePriority(playerIndex);
+      if (!this.canUseSpecial(playerIndex)) throw new Error('Special move cannot be activated.');
+      p.specialUsed = true;
+      this.state.homuraChainLockTurn = this.state.turn;
+      this.state.homuraChainLockPlayer = this.opponent(playerIndex);
+      this.emit('special', { player: playerIndex, character: p.character.id });
+      this.log(`${p.name}の必殺技 — このターン、相手はチェーン不可`);
+      return;
+    }
     return super.activateSpecial(playerIndex);
   }
 
