@@ -12,7 +12,11 @@ export class NagisaAdapter extends ThreeCharacterAdapter {
     const decision = this.engine.state.pendingDecision;
     if (decision?.type === 'NAGISA_ATTACKER') {
       if (decision.player !== playerIndex) return [];
-      return decision.options.map(slot => encodeRevive(slot));
+      return [
+        ...(decision.allowEnd ? [ACTIONS.END_TURN] : []),
+        ...decision.ownOptions.map(slot => encodeAttack(slot, null)),
+        ...decision.opponentOptions.map(slot => encodeRevive(slot)),
+      ];
     }
     if (decision?.type === 'NAGISA_TARGET') {
       if (decision.player !== playerIndex) return [];
@@ -30,9 +34,20 @@ export class NagisaAdapter extends ThreeCharacterAdapter {
     const decision = this.engine.state.pendingDecision;
     if (decision?.type === 'NAGISA_ATTACKER') {
       if (!this.legalActions(playerIndex).includes(action)) throw new Error(`Illegal action ${action} for player ${playerIndex}.`);
-      const opponentSlot = action - ACTIONS.REVIVE_BASE;
       this.stats.actions += 1;
-      this.engine.selectNagisaAttacker(playerIndex, opponentSlot);
+      if (action === ACTIONS.END_TURN) {
+        this.engine.endNagisaSpecial(playerIndex);
+      } else if (action >= ACTIONS.REVIVE_BASE && action < ACTIONS.COUNT) {
+        this.engine.selectNagisaAttacker(playerIndex, 'opponent', action - ACTIONS.REVIVE_BASE);
+      } else if (action >= ACTIONS.ATTACK_BASE && action < ACTIONS.MAIN_MAGIC_BASE) {
+        const offset = action - ACTIONS.ATTACK_BASE;
+        const slot = Math.floor(offset / ATTACK_TARGETS);
+        const target = offset % ATTACK_TARGETS;
+        if (target !== RL_LIMITS.FIELD_SLOTS || !decision.ownOptions.includes(slot)) throw new Error('Invalid Nagisa own attacker action.');
+        this.engine.selectNagisaAttacker(playerIndex, 'self', slot);
+      } else {
+        throw new Error('Invalid Nagisa attacker action.');
+      }
       this._afterAction();
       return;
     }
