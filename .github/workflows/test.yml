@@ -16,7 +16,7 @@ jobs:
       - name: Browser app syntax
         run: node --check src/app.js
       - name: Core regression tests
-        run: node --test tests/engine.test.mjs tests/hand-tributes.test.mjs tests/rl-adapter.test.mjs tests/evaluation-ai.test.mjs tests/genetics.test.mjs tests/character-ai.test.mjs tests/duel-log.test.mjs tests/cfr.test.mjs tests/best-response.test.mjs tests/sayaka.test.mjs
+        run: node --test tests/engine.test.mjs tests/hand-tributes.test.mjs tests/rl-adapter.test.mjs tests/evaluation-ai.test.mjs tests/genetics.test.mjs tests/character-ai.test.mjs tests/duel-log.test.mjs tests/cfr.test.mjs tests/best-response.test.mjs tests/sayaka.test.mjs tests/kyoko.test.mjs
       - name: WebP card assets
         run: node --test --test-name-pattern='all gameplay card art uses non-placeholder WebP assets' tests/integration.test.mjs
       - name: 300-duel regression
@@ -145,4 +145,14 @@ jobs:
         with:
           name: three-character-rollout
           path: /tmp/three-character-rollout.json
+          retention-days: 7
+      - name: Four-character mutual rollout
+        if: contains(github.event.head_commit.message, '[four-rollout]')
+        run: node br/four-character-rollout.mjs --games 100 --samples 8 --min-gain 0.05 --max-actions 300 --output /tmp/four-character-rollout.json
+      - name: Upload four-character mutual rollout
+        if: contains(github.event.head_commit.message, '[four-rollout]')
+        uses: actions/upload-artifact@v4
+        with:
+          name: four-character-rollout
+          path: /tmp/four-character-rollout.json
           retention-days: 7
