@@ -25,6 +25,17 @@ function damageScore(playerIndex, damagedPlayer, amount) {
   return damagedPlayer === playerIndex ? -amount * 15 : amount * 12;
 }
 
+function directAllowedFor(engine, playerIndex, attackerPlayer, attackerSlot) {
+  const opponentPlayer = engine.opponent(playerIndex);
+  const opponentSlots = engine.player(opponentPlayer).field
+    .map((card, slot) => monster(card) ? slot : null)
+    .filter(slot => slot !== null);
+  if (attackerPlayer === playerIndex) return opponentSlots.length === 0;
+  return attackerPlayer === opponentPlayer
+    && opponentSlots.length === 1
+    && opponentSlots[0] === attackerSlot;
+}
+
 function battleScore(engine, playerIndex, attackerPlayer, attackerSlot, targetSide, targetSlot = null, attackBonus = 0) {
   const opponentPlayer = engine.opponent(playerIndex);
   const attacker = engine.player(attackerPlayer).field[attackerSlot];
@@ -32,8 +43,7 @@ function battleScore(engine, playerIndex, attackerPlayer, attackerSlot, targetSi
   const attack = (attacker.attack ?? 0) + attackBonus;
 
   if (targetSide === 'direct') {
-    if (attackerPlayer !== playerIndex) return -Infinity;
-    if (engine.player(opponentPlayer).field.some(monster)) return -Infinity;
+    if (!directAllowedFor(engine, playerIndex, attackerPlayer, attackerSlot)) return -Infinity;
     const lethal = attack >= engine.player(opponentPlayer).deck.length ? 10000 : 0;
     return lethal + damageScore(playerIndex, opponentPlayer, attack);
   }
@@ -79,7 +89,7 @@ function bestTarget(engine, playerIndex, attackerSide, attackerSlot) {
       candidates.push({ side: 'opponent', slot, score: battleScore(engine, playerIndex, attackerPlayer, attackerSlot, 'opponent', slot) });
     }
   }
-  if (attackerPlayer === playerIndex && engine.player(engine.opponent(playerIndex)).field.every(card => !monster(card))) {
+  if (directAllowedFor(engine, playerIndex, attackerPlayer, attackerSlot)) {
     candidates.push({ side: 'direct', slot: null, score: battleScore(engine, playerIndex, attackerPlayer, attackerSlot, 'direct') });
   }
   return candidates.sort((a, b) => b.score - a.score)[0] ?? null;
