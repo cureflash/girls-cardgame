@@ -16,7 +16,7 @@ jobs:
       - name: Browser app syntax
         run: node --check src/app.js
       - name: Core regression tests
-        run: node --test tests/engine.test.mjs tests/hand-tributes.test.mjs tests/rl-adapter.test.mjs tests/evaluation-ai.test.mjs tests/genetics.test.mjs tests/character-ai.test.mjs tests/duel-log.test.mjs tests/cfr.test.mjs tests/best-response.test.mjs
+        run: node --test tests/engine.test.mjs tests/hand-tributes.test.mjs tests/rl-adapter.test.mjs tests/evaluation-ai.test.mjs tests/genetics.test.mjs tests/character-ai.test.mjs tests/duel-log.test.mjs tests/cfr.test.mjs tests/best-response.test.mjs tests/sayaka.test.mjs
       - name: WebP card assets
         run: node --test --test-name-pattern='all gameplay card art uses non-placeholder WebP assets' tests/integration.test.mjs
       - name: 300-duel regression
@@ -125,4 +125,14 @@ jobs:
         with:
           name: witch-damage-current-meta
           path: /tmp/witch-damage-current-meta.json
+          retention-days: 7
+      - name: Three-character round robin
+        if: contains(github.event.head_commit.message, '[three-character]')
+        run: node br/three-character-round-robin.mjs --games 600 --tuning-games 120 --max-actions 300 --output /tmp/three-character-round-robin.json
+      - name: Upload three-character round robin
+        if: contains(github.event.head_commit.message, '[three-character]')
+        uses: actions/upload-artifact@v4
+        with:
+          name: three-character-round-robin
+          path: /tmp/three-character-round-robin.json
           retention-days: 7
