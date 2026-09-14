@@ -9,6 +9,7 @@ export class GameEngine extends NagisaGameEngine {
     if (
       card?.effect === 'nullifyDamage'
       && battle
+      && !battle.nagisaForced
       && !battle.direct
       && playerIndex === battle.attackerPlayer
       && (this.state.chain?.length ?? 0) === 0
