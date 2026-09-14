@@ -17,7 +17,7 @@ function mechanical(deck) {
 }
 
 test('all six characters expose WebP portraits and intended opening hand modifiers', () => {
-  const expected = { madoka: 0, mami: 0, sayaka: 0, kyoko: -1, homura: 3, nagisa: 0 };
+  const expected = { madoka: 0, mami: -1, sayaka: 0, kyoko: 0, homura: 1, nagisa: 0 };
   for (const [id, modifier] of Object.entries(expected)) {
     assert.equal(CHARACTERS[id].openingHandModifier, modifier, `${id} opening modifier`);
     assert.match(CHARACTERS[id].image, /^\.\/assets\/characters\/.+\.webp$/);
@@ -59,7 +59,7 @@ test('createDeck remains safe as an Array.map callback for analysis code', () =>
 });
 
 test('canonical six-character engine applies exact starting hands and adapter initializes for every character', () => {
-  const expectedHands = { madoka: 5, mami: 5, sayaka: 5, kyoko: 4, homura: 8, nagisa: 5 };
+  const expectedHands = { madoka: 5, mami: 4, sayaka: 5, kyoko: 5, homura: 6, nagisa: 5 };
   for (const [id, handSize] of Object.entries(expectedHands)) {
     const engine = new GameEngine({
       players: [
