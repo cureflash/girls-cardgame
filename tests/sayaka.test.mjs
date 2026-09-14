@@ -16,14 +16,34 @@ function makeEngine() {
   });
 }
 
-test('Sayaka deck keeps 30 cards and reduces witch tribute thresholds by one', () => {
+function mechanicalDeck(character) {
+  return createDeck(character).map(card => ({
+    type: card.type,
+    attack: card.attack ?? null,
+    rank: card.rank ?? null,
+    tributeThreshold: card.tributeThreshold ?? null,
+    effect: card.effect ?? null,
+    value: card.value ?? null,
+    chainable: card.chainable ?? null,
+  }));
+}
+
+test('Madoka, Mami, and Sayaka decks have identical mechanical contents', () => {
+  const madoka = mechanicalDeck('madoka');
+  const mami = mechanicalDeck('mami');
+  const sayaka = mechanicalDeck('sayaka');
+  assert.equal(madoka.length, 30);
+  assert.deepEqual(mami, madoka);
+  assert.deepEqual(sayaka, madoka);
+});
+
+test('Sayaka passive reduces the effective witch tribute requirement by one without changing card stats', () => {
   const deck = createDeck('sayaka');
-  assert.equal(deck.length, 30);
   const thresholds = deck.filter(card => card.type === 'witch').map(card => [card.attack, card.tributeThreshold]);
   assert.deepEqual([...new Set(thresholds.map(JSON.stringify))].map(JSON.parse).sort((a, b) => a[0] - b[0]), [
-    [8, 7],
-    [10, 9],
-    [13, 12],
+    [8, 8],
+    [10, 10],
+    [13, 13],
   ]);
 
   const engine = makeEngine();
@@ -34,6 +54,7 @@ test('Sayaka deck keeps 30 cards and reduces witch tribute thresholds by one', (
   const familiar4 = source.find(card => card.type === 'familiar' && card.attack === 4);
   p.hand = [{ ...witch8 }, { ...familiar3 }, { ...familiar4 }];
   p.field = Array(5).fill(null);
+  p.graveyard = [];
   p.summonedThisTurn = false;
   engine.state.phase = PHASES.MAIN;
   engine.state.activePlayer = 0;
@@ -41,23 +62,31 @@ test('Sayaka deck keeps 30 cards and reduces witch tribute thresholds by one', (
   engine.state.pendingDecision = null;
 
   const plans = engine.validTributeSets(0, p.hand[0]);
-  assert.ok(plans.some(plan => plan.total === 7 && plan.handIds.length === 2));
+  const sevenPointPlan = plans.find(plan => plan.total === 7 && plan.handIds.length === 2);
+  assert.ok(sevenPointPlan);
+  assert.equal(engine.canSummon(0, p.hand[0].id), true);
+  engine.summon(0, p.hand[0].id, sevenPointPlan.handIds.map(id => ({ zone: 'hand', id })));
+  const summoned = p.field.find(Boolean);
+  assert.equal(summoned.attack, 8);
+  assert.equal(summoned.tributeThreshold, 8);
 });
 
-test('Sayaka special returns any three graveyard cards to the bottom of the deck and ends the turn', () => {
+test('Sayaka special returns any three graveyard cards, shuffles the whole deck, and ends the turn', () => {
   const engine = makeEngine();
   const adapter = new ThreeCharacterAdapter(engine);
   const p = engine.player(0);
-  const cards = createDeck('sayaka').slice(0, 3).map(card => ({ ...card }));
-  const expectedIds = cards.map(card => card.id);
-  p.graveyard = cards;
+  const recycled = p.deck.splice(0, 3);
+  p.graveyard = recycled;
   p.deck = p.deck.slice(0, 9);
+  const expectedIds = [...p.deck, ...p.graveyard].map(card => card.id).sort();
   p.specialUsed = false;
   engine.state.phase = PHASES.BATTLE_START;
   engine.state.activePlayer = 0;
   engine.state.priorityPlayer = 0;
   engine.state.pendingDecision = null;
   engine.state.turn = 5;
+  let shuffleCalls = 0;
+  engine.rng = () => { shuffleCalls += 1; return 0.5; };
 
   assert.equal(engine.canUseSpecial(0), true);
   const beforeDeck = p.deck.length;
@@ -73,7 +102,10 @@ test('Sayaka special returns any three graveyard cards to the bottom of the deck
 
   assert.equal(p.graveyard.length, 0);
   assert.equal(p.deck.length, beforeDeck + 3);
-  assert.deepEqual(p.deck.slice(-3).map(card => card.id), expectedIds);
+  assert.deepEqual(p.deck.map(card => card.id).sort(), expectedIds);
+  assert.ok(shuffleCalls > 0);
+  const recycleEvent = engine.state.events.findLast(event => event.type === 'recycle');
+  assert.equal(recycleEvent?.shuffled, true);
   assert.equal(p.specialUsed, true);
   assert.equal(engine.state.pendingDecision, null);
   assert.equal(engine.state.turn, 6);
