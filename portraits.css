@@ -1,9 +1,9 @@
-.player[data-character="madoka"]{--portrait-image:url("./assets/characters/madoka.webp")}
-.player[data-character="mami"]{--portrait-image:url("./assets/characters/mami.webp");--accent:var(--gold)}
-.player[data-character="sayaka"]{--portrait-image:url("./assets/characters/sayaka.webp?v=faces5");--accent:#8fd7f2}
-.player[data-character="kyoko"]{--portrait-image:url("./assets/characters/kyoko.webp");--accent:#e98b92}
-.player[data-character="homura"]{--portrait-image:url("./assets/characters/homura.webp");--accent:#b9a2e8}
-.player[data-character="nagisa"]{--portrait-image:url("./assets/characters/nagisa.webp");--accent:#efe1c8}
+.player[data-character="madoka"]{--portrait-image:url("./assets/characters/madoka.webp?v=faces6")}
+.player[data-character="mami"]{--portrait-image:url("./assets/characters/mami.webp?v=faces6");--accent:var(--gold)}
+.player[data-character="sayaka"]{--portrait-image:url("./assets/characters/sayaka.webp?v=faces6");--accent:#8fd7f2}
+.player[data-character="kyoko"]{--portrait-image:url("./assets/characters/kyoko.webp?v=faces6");--accent:#e98b92}
+.player[data-character="homura"]{--portrait-image:url("./assets/characters/homura.webp?v=faces6");--accent:#b9a2e8}
+.player[data-character="nagisa"]{--portrait-image:url("./assets/characters/nagisa.webp?v=faces6");--accent:#efe1c8}
 
 #top-player,#bottom-player{display:grid;grid-template-columns:150px minmax(0,1fr);column-gap:14px}
 #top-player{grid-template-areas:"head head" "portrait hidden" "portrait field"}
