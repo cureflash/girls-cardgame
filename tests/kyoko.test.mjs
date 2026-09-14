@@ -16,6 +16,17 @@ function makeEngine() {
   });
 }
 
+function makeHomuraEngine(opponent = 'mami') {
+  return new GameEngine({
+    players: [
+      { id: 'p0', name: CHARACTERS.homura.name, character: CHARACTERS.homura },
+      { id: 'p1', name: CHARACTERS[opponent].name, character: CHARACTERS[opponent] },
+    ],
+    decks: [createDeck('homura'), createDeck(opponent)],
+    rng: () => 0.5,
+  });
+}
+
 function mechanicalDeck(character) {
   return createDeck(character).map(card => ({
     type: card.type,
@@ -41,12 +52,14 @@ function firstBy(deck, type, attack) {
   return { ...deck.find(card => card.type === type && card.attack === attack) };
 }
 
-test('Kyoko deck is mechanically identical to the other three and has no passive bonus', () => {
+test('Kyoko and Homura decks are mechanically identical to the shared deck', () => {
   const base = mechanicalDeck('madoka');
-  for (const character of ['mami', 'sayaka', 'kyoko']) assert.deepEqual(mechanicalDeck(character), base);
+  for (const character of ['mami', 'sayaka', 'kyoko', 'homura']) assert.deepEqual(mechanicalDeck(character), base);
   assert.equal(base.length, 30);
   assert.equal(CHARACTERS.kyoko.passive, 'なし');
+  assert.equal(CHARACTERS.homura.passive, '使い魔・魔女の攻撃力＋1');
   assert.deepEqual([...new Set(createDeck('kyoko').filter(card => card.type === 'witch').map(card => card.tributeThreshold))].sort((a, b) => a - b), [8, 10, 13]);
+  assert.deepEqual([...new Set(createDeck('homura').filter(card => card.type === 'witch').map(card => card.tributeThreshold))].sort((a, b) => a - b), [8, 10, 13]);
 });
 
 test('Kyoko can use one opposing ATK 10 monster plus her own ATK 3 familiar to summon an ATK 13 witch', () => {
@@ -149,4 +162,62 @@ test('Kyoko cannot activate her special unless an opposing monster can contribut
 
   own.hand.push(firstBy(ownDeck, 'familiar', 5), { ...ownDeck.find(card => card.type === 'familiar' && card.attack === 5), id: 'extra-familiar-5' });
   assert.equal(engine.canUseSpecial(0), true);
+});
+
+test('Homura passive adds one attack in battle without changing printed card attack', () => {
+  const engine = makeHomuraEngine('mami');
+  const own = engine.player(0);
+  const opponent = engine.player(1);
+  own.hand = [];
+  opponent.hand = [];
+  own.field = [firstBy(createDeck('homura'), 'familiar', 3), null, null, null, null];
+  opponent.field = [firstBy(createDeck('mami'), 'familiar', 3), null, null, null, null];
+  engine.state.phase = PHASES.BATTLE;
+  engine.state.activePlayer = 0;
+  engine.state.priorityPlayer = 0;
+  engine.state.pendingDecision = null;
+  engine.state.turn = 2;
+
+  engine.attack(0, 0, 0);
+
+  const battleEnd = engine.state.events.findLast(event => event.type === 'battleEnd');
+  assert.equal(battleEnd?.attackValue, 4);
+  assert.equal(battleEnd?.defendValue, 3);
+  assert.equal(own.field[0]?.attack, 3);
+  assert.equal(opponent.field[0], null);
+});
+
+test('Homura passive counts two printed ATK 3 familiars as eight tribute power for an ATK 8 witch', () => {
+  const engine = makeHomuraEngine('mami');
+  const own = engine.player(0);
+  const source = createDeck('homura');
+  const witch8 = firstBy(source, 'witch', 8);
+  const familiars3 = source.filter(card => card.type === 'familiar' && card.attack === 3).slice(0, 2).map(card => ({ ...card }));
+  own.hand = [witch8, ...familiars3];
+  own.field = Array(5).fill(null);
+  own.graveyard = [];
+  own.summonedThisTurn = false;
+  engine.state.phase = PHASES.MAIN;
+  engine.state.activePlayer = 0;
+  engine.state.priorityPlayer = 0;
+  engine.state.pendingDecision = null;
+
+  const plan = engine.validTributeSets(0, witch8).find(candidate => candidate.total === 8 && candidate.handIds.length === 2);
+  assert.ok(plan);
+  engine.summon(0, witch8.id, plan.handIds.map(id => ({ zone: 'hand', id })));
+
+  const summoned = own.field.find(Boolean);
+  assert.equal(summoned?.attack, 8);
+  assert.equal(summoned?.tributeThreshold, 8);
+  assert.deepEqual(own.graveyard.map(card => card.attack).sort((a, b) => a - b), [3, 3]);
+});
+
+test('Homura currently has no special move', () => {
+  const engine = makeHomuraEngine('mami');
+  engine.state.phase = PHASES.BATTLE_START;
+  engine.state.activePlayer = 0;
+  engine.state.priorityPlayer = 0;
+  engine.state.pendingDecision = null;
+  engine.state.turn = 5;
+  assert.equal(engine.canUseSpecial(0), false);
 });
