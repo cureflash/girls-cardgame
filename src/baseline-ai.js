@@ -1,6 +1,7 @@
 import { ACTIVE_GENOMES } from './evolved-genome.js?v=g999';
 import { DEFAULT_GENOME, chooseEvaluationAction, normalizeEvaluationGenome } from './evaluation-ai.js';
 import { chooseNagisaAction } from './nagisa-ai.js';
+import { chooseRemainingCharacterAction } from './remaining-ai.js';
 
 const publishedGenomes = Object.freeze({
   madoka: ACTIVE_GENOMES?.madoka ? normalizeEvaluationGenome(ACTIVE_GENOMES.madoka) : DEFAULT_GENOME,
@@ -12,12 +13,15 @@ function genomeFor(adapter, player) {
   return publishedGenomes[character] ?? DEFAULT_GENOME;
 }
 
-// Built-in browser opponent. Madoka and Mami use separately evolved evaluation policies.
-// Nagisa's staged forced-battle decisions use a dedicated board evaluator.
-export function chooseBaselineAction(adapter, player = adapter.currentPlayer()) {
-  const nagisaAction = chooseNagisaAction(adapter, player);
+// Built-in browser opponent. Every current character now has its own policy path:
+// Madoka/Mami use evolved evaluation genomes, Nagisa uses forced-battle tactics,
+// and Sayaka/Kyoko/Homura use trained evaluation genomes plus character-specific tactics.
+export function chooseBaselineAction(adapter, player = adapter.currentPlayer(), rng = Math.random) {
+  const nagisaAction = chooseNagisaAction(adapter, player, rng);
   if (nagisaAction !== null) return nagisaAction;
-  return chooseEvaluationAction(adapter, player, genomeFor(adapter, player));
+  const dedicatedAction = chooseRemainingCharacterAction(adapter, player, rng);
+  if (dedicatedAction !== null) return dedicatedAction;
+  return chooseEvaluationAction(adapter, player, genomeFor(adapter, player), rng);
 }
 
 export function baselineGenome(characterId) {
