@@ -57,7 +57,7 @@ test('Kyoko and Homura decks are mechanically identical to the shared deck', () 
   for (const character of ['mami', 'sayaka', 'kyoko', 'homura']) assert.deepEqual(mechanicalDeck(character), base);
   assert.equal(base.length, 30);
   assert.equal(CHARACTERS.kyoko.passive, 'なし');
-  assert.equal(CHARACTERS.homura.passive, '使い魔・魔女の攻撃力＋1');
+  assert.equal(CHARACTERS.homura.passive, 'なし');
   assert.equal(CHARACTERS.homura.special, '発動ターン中、相手はチェーン不可');
   assert.deepEqual([...new Set(createDeck('kyoko').filter(card => card.type === 'witch').map(card => card.tributeThreshold))].sort((a, b) => a - b), [8, 10, 13]);
   assert.deepEqual([...new Set(createDeck('homura').filter(card => card.type === 'witch').map(card => card.tributeThreshold))].sort((a, b) => a - b), [8, 10, 13]);
@@ -165,13 +165,14 @@ test('Kyoko cannot activate her special unless an opposing monster can contribut
   assert.equal(engine.canUseSpecial(0), true);
 });
 
-test('Homura passive adds one attack in battle without changing printed card attack', () => {
+test('Homura has no passive attack bonus in battle', () => {
   const engine = makeHomuraEngine('mami');
   const own = engine.player(0);
   const opponent = engine.player(1);
+  const homuraFamiliar = firstBy(createDeck('homura'), 'familiar', 3);
   own.hand = [];
   opponent.hand = [];
-  own.field = [firstBy(createDeck('homura'), 'familiar', 3), null, null, null, null];
+  own.field = [homuraFamiliar, null, null, null, null];
   opponent.field = [firstBy(createDeck('mami'), 'familiar', 3), null, null, null, null];
   engine.state.phase = PHASES.BATTLE;
   engine.state.activePlayer = 0;
@@ -182,13 +183,12 @@ test('Homura passive adds one attack in battle without changing printed card att
   engine.attack(0, 0, 0);
 
   const battleEnd = engine.state.events.findLast(event => event.type === 'battleEnd');
-  assert.equal(battleEnd?.attackValue, 4);
+  assert.equal(battleEnd?.attackValue, 3);
   assert.equal(battleEnd?.defendValue, 3);
-  assert.equal(own.field[0]?.attack, 3);
-  assert.equal(opponent.field[0], null);
+  assert.equal(homuraFamiliar.attack, 3);
 });
 
-test('Homura passive counts two printed ATK 3 familiars as eight tribute power for an ATK 8 witch', () => {
+test('Homura has no passive tribute bonus', () => {
   const engine = makeHomuraEngine('mami');
   const own = engine.player(0);
   const source = createDeck('homura');
@@ -203,14 +203,9 @@ test('Homura passive counts two printed ATK 3 familiars as eight tribute power f
   engine.state.priorityPlayer = 0;
   engine.state.pendingDecision = null;
 
-  const plan = engine.validTributeSets(0, witch8).find(candidate => candidate.total === 8 && candidate.handIds.length === 2);
-  assert.ok(plan);
-  engine.summon(0, witch8.id, plan.handIds.map(id => ({ zone: 'hand', id })));
-
-  const summoned = own.field.find(Boolean);
-  assert.equal(summoned?.attack, 8);
-  assert.equal(summoned?.tributeThreshold, 8);
-  assert.deepEqual(own.graveyard.map(card => card.attack).sort((a, b) => a - b), [3, 3]);
+  assert.equal(engine.validTributeSets(0, witch8).length, 0);
+  assert.deepEqual(familiars3.map(card => card.attack), [3, 3]);
+  assert.equal(witch8.tributeThreshold, 8);
 });
 
 test('Homura special keeps battle available, allows her boost chain, and prevents the opponent from chaining', () => {
@@ -246,7 +241,7 @@ test('Homura special keeps battle available, allows her boost chain, and prevent
   assert.equal(own.graveyard.some(card => card.id === boost.id), true);
   assert.equal(opponent.field[0], null);
   const battleEnd = engine.state.events.findLast(event => event.type === 'battleEnd');
-  assert.equal(battleEnd?.attackValue, 6);
+  assert.equal(battleEnd?.attackValue, 5);
   assert.equal(battleEnd?.defendValue, 3);
   assert.equal(engine.state.turn, 5);
   assert.equal(engine.state.activePlayer, 0);
