@@ -1,0 +1,23 @@
+name: sayaka-minus3
+
+on:
+  push:
+    branches: ['**']
+
+jobs:
+  simulate:
+    if: contains(github.event.head_commit.message, '[sayaka-minus3]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Sayaka minus-3 four-character rollout
+        run: node br/four-character-rollout.mjs --games 100 --samples 8 --min-gain 0.05 --max-actions 300 --output /tmp/sayaka-minus3-four-character.json
+      - name: Upload Sayaka minus-3 report
+        uses: actions/upload-artifact@v4
+        with:
+          name: sayaka-minus3-four-character
+          path: /tmp/sayaka-minus3-four-character.json
+          retention-days: 7
