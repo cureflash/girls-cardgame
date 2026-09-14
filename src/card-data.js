@@ -5,7 +5,7 @@ export const CHARACTERS = {
   mami: { id: 'mami', name: '巴マミ', passive: '初期手札が1枚多い', special: 'ティロ・フィナーレ', image: './assets/characters/mami.webp' },
   sayaka: { id: 'sayaka', name: '美樹さやか', passive: '魔女召喚の生贄に必要な攻撃力合計を3減らす', special: '墓地の任意のカード3枚をデッキに戻してシャッフル', image: null },
   kyoko: { id: 'kyoko', name: '佐倉杏子', passive: 'なし', special: '相手の使い魔・魔女1体を生贄にして魔女召喚', image: null },
-  homura: { id: 'homura', name: '暁美ほむら', passive: '使い魔・魔女の攻撃力＋1', special: '発動ターン中、相手はチェーン不可', image: null },
+  homura: { id: 'homura', name: '暁美ほむら', passive: 'なし', special: '発動ターン中、相手はチェーン不可', image: null },
 };
 const SKINS = {
   madoka: {
