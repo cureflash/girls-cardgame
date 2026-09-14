@@ -11,7 +11,7 @@ function makeEngine() {
   const deck = prefix => Array.from({ length: 20 }, (_, i) => familiar(`${prefix}-${i}`, 2));
   return new GameEngine({
     players: [
-      { id: 'p0', name: 'ほむら', character: { id: 'homura', name: '暁美ほむら', openingHandModifier: 3 } },
+      { id: 'p0', name: 'ほむら', character: { id: 'homura', name: '暁美ほむら', openingHandModifier: 1 } },
       { id: 'p1', name: 'まどか', character: { id: 'madoka', name: '鹿目まどか', openingHandModifier: 0 } },
     ],
     decks: [deck('h'), deck('m')],
