@@ -157,6 +157,7 @@ function collectEvents(adapter, startIndex, battleBefore, cards) {
 function playGame({ pair, seed, samples, maxActions, minGain }) {
   const adapter = createMatch(seed, Boolean(seed & 1));
   const cards = {};
+  const decisions = { madoka: 0, mami: 0 };
   let cutoffs = 0;
 
   for (let step = 0; step < maxActions && adapter.engine.state.phase !== PHASES.GAME_OVER; step++) {
@@ -166,9 +167,12 @@ function playGame({ pair, seed, samples, maxActions, minGain }) {
     let action;
     if (legal.length === 1) action = legal[0];
     else {
+      const character = adapter.engine.player(player).character?.id ?? 'unknown';
+      const decisionIndex = decisions[character] ?? 0;
+      if (character === 'madoka' || character === 'mami') decisions[character] += 1;
       const decision = evaluateDecision(adapter, player, pair, {
         samples,
-        seed: (seed * 1000003 + step * 9176 + (adapter.engine.player(player).character?.id === 'mami' ? 7919 : 0)) >>> 0,
+        seed: (seed * 1000003 + step * 9176 + decisionIndex * 37 + (character === 'mami' ? 7919 : 0)) >>> 0,
         maxActions,
         minGain,
       });
