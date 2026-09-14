@@ -64,6 +64,29 @@ The planner made 2,680 non-forced decisions and deviated from the current-meta M
 14. use +5 boost: 7
 15. summon ATK 13 witch: 1
 
+## Reverse hidden-information rollout best response
+
+The same procedure was run in the opposite direction: current-meta Madoka remained fixed while Mami received the conservative rollout planner.
+
+Results:
+
+| Mami policy vs current-meta Madoka | Wins | Losses | Win rate |
+|---|---:|---:|---:|
+| Current-meta Mami champion | 57 | 43 | 57% |
+| Conservative rollout planner | 84 | 16 | 84% |
+
+Observed lift: **+27 percentage points**.
+
+Paired outcomes on the same 100 seeds:
+
+- both win: 51
+- both lose: 10
+- planner-only win: 33
+- current-meta Mami-only win: 6
+- two-sided paired sign-test p-value: **1.429926123819314e-5**
+
+The Mami planner made 2,379 non-forced decisions and deviated from the current-meta Mami champion on 583 of them (24.51%). Its most common deviations were: end turn (258), +2 boost (53), +3 boost (44), enter battle (43), summon ATK 3 familiar (40), summon ATK 4 familiar (31), continue battle (19), pass (18), shield (18), summon ATK 5 familiar (11), summon ATK 8 witch (7), +5 boost (6), and Tiro Finale (6).
+
 ## Mutual rollout probe
 
 Both characters were then given the same conservative hidden-information rollout rule on top of the same current-meta generation-99 pair. Candidate rollouts still use the fixed current-meta policies after the candidate action, so this is a mutual one-step policy-improvement probe rather than a recursive exact equilibrium solver.
@@ -98,10 +121,21 @@ Most common Madoka deviations: end turn (269), enter battle (70), +2 boost (60),
 
 Most common Mami deviations: end turn (452), +2 boost (88), enter battle (84), +3 boost (67), summon ATK 3 familiar (45), shield (45), pass (42), summon ATK 4 familiar (36), continue battle (27), summon ATK 8 witch (20).
 
+## Empirical 2x2 strategy matrix
+
+The following summarizes the four measured policy pairings as Madoka win rate. The unilateral probes use independent balanced seed sets, so the baseline cell varies by roughly one percentage point across runs; this table uses the Madoka-side unilateral baseline result for the base/base cell.
+
+| Madoka \ Mami | Current-meta policy | Rollout policy |
+|---|---:|---:|
+| Current-meta policy | 42% | 16% |
+| Rollout policy | 84% | 49% |
+
+Within this restricted two-strategy set, the rollout policy strictly dominates the current-meta one-step policy for **both** characters. Therefore the empirical restricted-game equilibrium is the rollout/rollout cell, observed here at approximately **49% Madoka / 51% Mami**. This statement is exact only for the measured two-policy strategy set; it is not a proof of full-game Nash equilibrium.
+
 ## Current interpretation
 
-The 84% Madoka result was largely a best-response exploit against a fixed Mami policy, not evidence that Madoka is intrinsically an 84% favorite. When both characters receive the same hidden-information search capability, the matchup moves to **49% / 51%**, essentially even in this 100-game probe.
+The 84% unilateral results are largely best-response exploitation of fixed one-step evaluation policies, not evidence that either character is intrinsically an 84% favorite. When both characters receive the same hidden-information search capability, the matchup moves to **49% / 51%**, essentially even in this 100-game probe.
 
 This also changes the strategic interpretation. The strongest pattern found so far is not pure counterplay or boss rushing. Both sides improve mainly by declining low-value continuations, ending turns earlier, preserving ordinary familiars, using small boosts more precisely, and choosing battle timing more selectively. The current-meta GA's 41.75% / 58.25% split therefore contains a substantial policy-quality component in addition to any underlying card/character balance difference.
 
-The next matrix entry to measure is the reverse unilateral best response: rollout Mami against fixed current-meta Madoka. That will complete the 2x2 empirical strategy matrix before attempting a deeper equilibrium approximation.
+The next step toward a deeper equilibrium approximation is to search for a best response to the rollout policy itself rather than to the original current-meta one-step policy. If neither side can gain materially against the mutual rollout policy, the 49/51 result becomes much stronger evidence of approximate equilibrium; if a new response gains sharply, it should be added as another policy in an iterative policy-space response-oracle cycle.
