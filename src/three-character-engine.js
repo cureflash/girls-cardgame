@@ -3,6 +3,24 @@ import { GameEngine as BaseGameEngine, PHASES, CARD_TYPES } from './game-engine.
 export { PHASES, CARD_TYPES };
 
 export class GameEngine extends BaseGameEngine {
+  constructor(options) {
+    super(options);
+    const openingHand = options?.openingHand ?? 5;
+    this.state.players.forEach((p, i) => {
+      const modifier = p.character?.openingHandModifier ?? 0;
+      const desired = Math.max(0, openingHand + modifier);
+      if (p.hand.length > desired) {
+        const returned = p.hand.splice(desired);
+        p.deck.unshift(...returned);
+      } else if (p.hand.length < desired) {
+        const needed = desired - p.hand.length;
+        for (let n = 0; n < needed && p.deck.length; n++) p.hand.push(p.deck.shift());
+      }
+      const initialDraw = this.state.events.find(event => event.type === 'draw' && event.player === i);
+      if (initialDraw) initialDraw.count = p.hand.length;
+    });
+  }
+
   _effectiveMonsterAttack(playerIndex, card) {
     return card?.attack ?? 0;
   }
