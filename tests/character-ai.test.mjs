@@ -77,7 +77,7 @@ test('Nagisa special can choose attackers from both fields and can be ended earl
   assert.equal(engine.player(0).specialUsed, true);
 });
 
-test('Nagisa can force multiple battles and direct attack only after the opponent field is empty', () => {
+test('Nagisa can force multiple battles and direct attack after the opponent field is empty', () => {
   const engine = nagisaEngine();
   engine.player(0).field[0] = monster('own-10', 10);
   engine.player(0).field[1] = monster('own-5', 5);
@@ -103,17 +103,50 @@ test('Nagisa can force multiple battles and direct attack only after the opponen
   assert.equal(engine.state.activePlayer, 1);
 });
 
-test('a lone opponent monster cannot attack its owner directly under the new Nagisa rule', () => {
+test('a lone opponent monster can be forced to attack its owner directly', () => {
   const engine = nagisaEngine();
   engine.player(1).field[0] = monster('enemy-5', 5);
-  assert.equal(engine.canUseSpecial(0), false);
 
-  engine.player(0).field[0] = monster('own-8', 8);
   assert.equal(engine.canUseSpecial(0), true);
   engine.activateSpecial(0);
+  assert.deepEqual(engine.state.pendingDecision.opponentOptions, [0]);
   engine.selectNagisaAttacker(0, 'opponent', 0);
-  assert.equal(engine.state.pendingDecision.directAllowed, false);
-  assert.deepEqual(engine.state.pendingDecision.ownTargets, [0]);
+  assert.equal(engine.state.pendingDecision.directAllowed, true);
+  assert.deepEqual(engine.state.pendingDecision.ownTargets, []);
+  engine.resolveNagisaForcedBattle(0, 'direct');
+
+  const forcedDamage = engine.state.events.filter(event => event.type === 'damage' && event.forced);
+  assert.ok(forcedDamage.some(event => event.player === 1 && event.direct === true && event.amount === 5));
+  assert.equal(engine.player(1).field[0]?.id, 'enemy-5');
+  assert.equal(engine.state.activePlayer, 1);
+});
+
+test('Nagisa passive returns the first familiar destroyed by battle each turn to hand', () => {
+  const engine = nagisaEngine();
+  engine.player(0).field[0] = monster('familiar-a', 3);
+  engine.player(0).field[1] = monster('familiar-b', 4);
+
+  engine.destroy(0, 0, 'battle');
+  assert.equal(engine.player(0).field[0], null);
+  assert.ok(engine.player(0).hand.some(card => card.id === 'familiar-a'));
+  assert.ok(!engine.player(0).graveyard.some(card => card.id === 'familiar-a'));
+
+  engine.destroy(0, 1, 'battle');
+  assert.equal(engine.player(0).field[1], null);
+  assert.ok(engine.player(0).graveyard.some(card => card.id === 'familiar-b'));
+  assert.ok(!engine.player(0).hand.some(card => card.id === 'familiar-b'));
+});
+
+test('Nagisa passive does not return witches or familiars destroyed outside battle', () => {
+  const engine = nagisaEngine();
+  engine.player(0).field[0] = monster('witch-8', 8, CARD_TYPES.WITCH);
+  engine.destroy(0, 0, 'battle');
+  assert.ok(engine.player(0).graveyard.some(card => card.id === 'witch-8'));
+
+  engine.player(0).field[1] = monster('familiar-special', 3);
+  engine.destroy(0, 1, 'special');
+  assert.ok(engine.player(0).graveyard.some(card => card.id === 'familiar-special'));
+  assert.ok(!engine.player(0).hand.some(card => card.id === 'familiar-special'));
 });
 
 test('during Nagisa forced battle only Nagisa can use attack-up or shield', () => {
