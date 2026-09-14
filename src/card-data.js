@@ -5,7 +5,7 @@ export const CHARACTERS = {
   mami: { id: 'mami', name: '巴マミ', passive: '初期手札が1枚少ない', openingHandModifier: -1, special: 'ティロ・フィナーレ', image: './assets/characters/mami.webp' },
   sayaka: { id: 'sayaka', name: '美樹さやか', passive: '魔女召喚の生贄に必要な攻撃力合計を3減らす', openingHandModifier: 0, special: '墓地の任意のカード3枚をデッキに戻してシャッフル', image: './assets/characters/sayaka.webp' },
   kyoko: { id: 'kyoko', name: '佐倉杏子', passive: 'なし', openingHandModifier: 0, special: '相手の使い魔・魔女1体を生贄にして魔女召喚', image: './assets/characters/kyoko.webp' },
-  homura: { id: 'homura', name: '暁美ほむら', passive: '初期手札が1枚多い', openingHandModifier: 1, special: '戦闘前に手札の使い魔・魔女1体を生贄なしで追加召喚可能＋発動ターン中、相手はチェーン不可', image: './assets/characters/homura.webp' },
+  homura: { id: 'homura', name: '暁美ほむら', passive: '初期手札が3枚多い', openingHandModifier: 3, special: '戦闘前に手札の使い魔・魔女1体を生贄なしで追加召喚可能＋発動ターン中、相手はチェーン不可', image: './assets/characters/homura.webp' },
   nagisa: { id: 'nagisa', name: '百江なぎさ', passive: '自分の使い魔が戦闘で破壊される場合、1ターンに1度だけ手札に戻す', openingHandModifier: 0, special: '強制戦闘', image: './assets/characters/nagisa.webp' },
 };
 
