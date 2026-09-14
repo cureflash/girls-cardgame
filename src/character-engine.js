@@ -147,10 +147,27 @@ export class GameEngine extends NagisaGameEngine {
     this.beginChainWindow(playerIndex);
   }
 
+  respondChain(playerIndex, cardId = null) {
+    const d = this.state.pendingDecision;
+    if (cardId && d?.type === 'CHAIN_RESPONSE' && d.player === playerIndex && d.options.includes(cardId)) {
+      const card = this.player(playerIndex).hand.find(item => item.id === cardId);
+      if (card?.effect === 'boost' && this.player(playerIndex).character?.id === 'homura') {
+        card.value = (card.value ?? 0) + 2;
+        card.homuraBoostApplied = true;
+      }
+    }
+    return super.respondChain(playerIndex, cardId);
+  }
+
   resolveMagic(playerIndex, card) {
     let resolvedCard = card;
     if (card?.effect === 'boost' && this.player(playerIndex).character?.id === 'homura') {
-      resolvedCard = { ...card, value: (card.value ?? 0) + 2 };
+      if (card.homuraBoostApplied) {
+        resolvedCard = { ...card };
+        delete resolvedCard.homuraBoostApplied;
+      } else {
+        resolvedCard = { ...card, value: (card.value ?? 0) + 2 };
+      }
       this.log(`${this.player(playerIndex).name}のパッシブで${card.name}の効果量を＋2`);
     }
     if (card?.effect === 'nullifyDamage' && this.state.battle) {

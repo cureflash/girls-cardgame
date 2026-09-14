@@ -46,6 +46,29 @@ test('Homura special only locks the opponent chain and does not grant an extra s
   assert.equal(e.player(0).hand.some(card => card.id === 'familiar-5'), true);
 });
 
+test('Homura boost stores its effective value before the opponent responds', () => {
+  const e = makeEngine();
+  e.player(0).field[0] = familiar('homura-attacker', 3);
+  e.player(1).field[0] = familiar('defender', 8);
+  e.player(0).hand = [magic('homura-boost', 2)];
+  e.player(1).hand = [magic('opponent-boost', 2)];
+
+  e.endTurn(0);
+  e.endTurn(1);
+  e.enterBattlePhase(0);
+  e.continueBattlePhase(0);
+  e.attack(0, 0, 0);
+  e.respondChain(0, 'homura-boost');
+
+  assert.equal(e.state.pendingDecision?.type, 'CHAIN_RESPONSE');
+  assert.equal(e.state.pendingDecision?.player, 1);
+  assert.equal(e.state.chain.at(-1)?.card.value, 4);
+
+  e.respondChain(1);
+  const battle = e.state.events.filter(event => event.type === 'battleEnd').at(-1);
+  assert.equal(battle?.attackValue, 7);
+});
+
 test('Homura attack-up magic always gains an additional +2', () => {
   const e = makeEngine();
   e.state.battle = {
