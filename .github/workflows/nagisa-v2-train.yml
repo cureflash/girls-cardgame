@@ -1,0 +1,17 @@
+name: nagisa-v2-train
+
+on:
+  push:
+    branches:
+      - analysis/nagisa-v2-train
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Train Nagisa v2 dedicated AI
+        run: node tools/train-nagisa-v2.mjs
