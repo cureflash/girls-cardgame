@@ -46,6 +46,13 @@ export class BattleBgm {
     this._play(this.special);
   }
 
+  stop() {
+    this._reset(this.normal);
+    this._reset(this.special);
+    this.current = null;
+    this.blocked = false;
+  }
+
   startGame() {
     this._reset(this.normal);
     this._reset(this.special);
@@ -53,6 +60,10 @@ export class BattleBgm {
   }
 
   handleEvent(event) {
+    if (event?.type === 'gameOver') {
+      this.stop();
+      return;
+    }
     if (!shouldStartSpecialBgm(event)) return;
 
     if (this.current === this.special) {
@@ -76,8 +87,8 @@ function bootstrap() {
   if (typeof window === 'undefined' || typeof document === 'undefined' || typeof Audio === 'undefined') return;
 
   const bgm = new BattleBgm({
-    normalSrc: './assets/audio/Battle_normal.mp3?v=bgm2',
-    specialSrc: './assets/audio/Battle_special.mp4?v=bgm2',
+    normalSrc: './assets/audio/Battle_normal.mp3?v=bgm3',
+    specialSrc: './assets/audio/Battle_special.mp4?v=bgm3',
   });
 
   bgm.startGame();
