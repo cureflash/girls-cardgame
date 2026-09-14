@@ -3,6 +3,45 @@ import { GameEngine as BaseGameEngine, PHASES, CARD_TYPES } from './game-engine.
 export { PHASES, CARD_TYPES };
 
 export class GameEngine extends BaseGameEngine {
+  _sayakaEffectiveThreshold(playerIndex, witchCard) {
+    const base = witchCard?.tributeThreshold ?? 0;
+    return this.player(playerIndex).character?.id === 'sayaka' && witchCard?.type === CARD_TYPES.WITCH
+      ? Math.max(0, base - 1)
+      : base;
+  }
+
+  validTributeSets(playerIndex, witchCard) {
+    if (this._sayakaSummonUsesDiscountedCard) return super.validTributeSets(playerIndex, witchCard);
+    const threshold = this._sayakaEffectiveThreshold(playerIndex, witchCard);
+    if (threshold === (witchCard?.tributeThreshold ?? 0)) return super.validTributeSets(playerIndex, witchCard);
+    return super.validTributeSets(playerIndex, { ...witchCard, tributeThreshold: threshold });
+  }
+
+  summon(playerIndex, cardId, tributeRefs = []) {
+    const p = this.player(playerIndex);
+    const card = p.hand.find(item => item.id === cardId);
+    if (p.character?.id !== 'sayaka' || card?.type !== CARD_TYPES.WITCH) {
+      return super.summon(playerIndex, cardId, tributeRefs);
+    }
+
+    const originalThreshold = card.tributeThreshold ?? 0;
+    card.tributeThreshold = this._sayakaEffectiveThreshold(playerIndex, card);
+    this._sayakaSummonUsesDiscountedCard = true;
+    try {
+      return super.summon(playerIndex, cardId, tributeRefs);
+    } finally {
+      this._sayakaSummonUsesDiscountedCard = false;
+      card.tributeThreshold = originalThreshold;
+      for (let i = this.state.events.length - 1; i >= 0; i--) {
+        const event = this.state.events[i];
+        if (event.card?.id === cardId) {
+          event.card.tributeThreshold = originalThreshold;
+          break;
+        }
+      }
+    }
+  }
+
   canUseSpecial(playerIndex) {
     const p = this.player(playerIndex);
     if (p.character?.id !== 'sayaka') return super.canUseSpecial(playerIndex);
@@ -48,12 +87,10 @@ export class GameEngine extends BaseGameEngine {
     }
 
     const returned = d.selectedCards;
-    // Position was not specified by the character rule, so cards are returned to the bottom
-    // in the selected order. This gives exactly +3 cards of deck life without adding shuffle variance.
-    p.deck.push(...returned);
-    this.emit('recycle', { player: playerIndex, cards: returned.map(item => ({ ...item })) });
+    p.deck = this.shuffle([...p.deck, ...returned]);
+    this.emit('recycle', { player: playerIndex, cards: returned.map(item => ({ ...item })), shuffled: true });
     this.state.pendingDecision = null;
-    this.log(`${p.name}は墓地の3枚をデッキの下に戻した`);
+    this.log(`${p.name}は墓地の3枚をデッキに戻してシャッフルした`);
     this._finishTurnAfterSpecial(playerIndex);
   }
 }
