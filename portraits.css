@@ -3,6 +3,7 @@
 .player[data-character="sayaka"]{--portrait-image:url("./assets/characters/sayaka.webp");--accent:#8fd7f2}
 .player[data-character="kyoko"]{--portrait-image:url("./assets/characters/kyoko.webp");--accent:#e98b92}
 .player[data-character="homura"]{--portrait-image:url("./assets/characters/homura.webp");--accent:#b9a2e8}
+.player[data-character="nagisa"]{--portrait-image:url("./assets/characters/nagisa.webp");--accent:#efe1c8}
 
 #top-player,#bottom-player{display:grid;grid-template-columns:150px minmax(0,1fr);column-gap:14px}
 #top-player{grid-template-areas:"head head" "portrait hidden" "portrait field"}
