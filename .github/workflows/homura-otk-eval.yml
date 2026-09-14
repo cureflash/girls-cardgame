@@ -1,0 +1,25 @@
+name: homura-otk-eval
+
+on:
+  push:
+    branches:
+      - analysis/homura-otk-roundrobin-v2
+    paths:
+      - 'tools/homura-otk-eval.mjs'
+      - '.github/workflows/homura-otk-eval.yml'
+      - 'src/**'
+  workflow_dispatch:
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run 100 games against each opponent
+        env:
+          GAMES: 100
+        run: node tools/homura-otk-eval.mjs
