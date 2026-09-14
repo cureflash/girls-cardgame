@@ -1,0 +1,40 @@
+import { makeEvaluationGenome } from './evaluation-ai.js';
+
+export const NAGISA_SPECIAL_THRESHOLD = 140;
+
+export const NAGISA_GENOME = Object.freeze(makeEvaluationGenome({
+  projectedDeckAdvantage: 4.906100346216985,
+  projectedHandAdvantage: -0.0900539977807409,
+  projectedFieldPowerAdvantage: 19.005356257604713,
+  projectedFieldCountAdvantage: -0.325995643310643,
+  projectedWitchPowerAdvantage: 4.867193614450214,
+  specialReserveAdvantage: 1.781273823095781,
+  madokaReviveAdvantage: 5.911598595225298,
+  damageToOpponent: -0.3881182303138814,
+  damageToSelf: -3.81906329679931,
+  enemyPowerRemoved: 5.2971187811707905,
+  ownPowerLost: -1.2079555365011445,
+  cardsSpent: 0.4885164820622304,
+  summonPower: 1.628718632273376,
+  witchSummon: -1.4376752235843626,
+  bossSummon: 4.7907852489164515,
+  drawCards: 4.382623741226184,
+  specialRemovalPower: 2.8640103445557736,
+  specialRemovalCount: 0.6276752859913454,
+  revivePower: -20.349871640254296,
+  salvationRevive: 1.3066176711885151,
+  turnEnds: -3.7342183763844785,
+  passAction: -0.681610172347459,
+  directAttack: -3.7250478053615823,
+  chainBoost: -7.787301039302446,
+  shieldUse: -2.2000932840339087,
+  shieldSavedPower: 3.189887766090605,
+  lethal: -46.86300740893296,
+  selfLethal: -13.8053967535595,
+  terminalWin: 1000,
+  terminalLoss: -1000,
+}, {
+  generation: 1,
+  id: 'nagisa-dedicated-v1',
+  parents: ['nagisa-g4-child-6-hall-g4'],
+}));
