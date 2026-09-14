@@ -17,3 +17,5 @@ jobs:
         env:
           GAMES: 100
         run: node tools/full-balance-roundrobin.mjs
+
+# Trigger after the workflow exists on this analysis branch.
