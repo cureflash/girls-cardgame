@@ -59,21 +59,25 @@ export class BattleBgm {
     this._play(this.normal);
   }
 
+  prepareSpecial() {
+    this._reset(this.normal);
+    this._reset(this.special);
+    this.current = null;
+    this.blocked = false;
+  }
+
+  startSpecial() {
+    this._reset(this.normal);
+    this._reset(this.special);
+    this._play(this.special);
+  }
+
   handleEvent(event) {
     if (event?.type === 'gameOver') {
       this.stop();
       return;
     }
-    if (!shouldStartSpecialBgm(event)) return;
-
-    if (this.current === this.special) {
-      if (this.special.paused || this.special.ended) this._restartSpecial();
-      return;
-    }
-
-    this._reset(this.normal);
-    this._reset(this.special);
-    this._play(this.special);
+    if (shouldStartSpecialBgm(event)) this.prepareSpecial();
   }
 
   unlock() {
@@ -87,12 +91,13 @@ function bootstrap() {
   if (typeof window === 'undefined' || typeof document === 'undefined' || typeof Audio === 'undefined') return;
 
   const bgm = new BattleBgm({
-    normalSrc: './assets/audio/Battle_normal.mp3?v=bgm3',
-    specialSrc: './assets/audio/Battle_special.mp4?v=bgm3',
+    normalSrc: './assets/audio/Battle_normal.mp3?v=bgm4',
+    specialSrc: './assets/audio/Battle_special.mp4?v=bgm4',
   });
 
   bgm.startGame();
   window.addEventListener('duel:event', event => bgm.handleEvent(event.detail));
+  window.addEventListener('duel:special-bgm', () => bgm.startSpecial());
   document.addEventListener('pointerdown', () => bgm.unlock(), { passive: true });
   document.addEventListener('keydown', () => bgm.unlock());
   document.addEventListener('click', event => {
