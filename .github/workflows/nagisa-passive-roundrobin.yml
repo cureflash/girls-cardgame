@@ -17,3 +17,5 @@ jobs:
         env:
           GAMES: 100
         run: node tools/nagisa-passive-roundrobin.mjs
+
+# This follow-up commit intentionally triggers the workflow after it exists on the branch.
