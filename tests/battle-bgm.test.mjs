@@ -19,15 +19,17 @@ class FakeAudio {
   dispatch(type) { this.listeners.get(type)?.(); }
 }
 
-const special = code => ({ type: 'summon', card: { code } });
+const special = (code, type = 'summon') => ({ type, card: { code } });
 
-test('special BGM target is only Walpurgis or Salvation Witch', () => {
+test('special BGM target is Walpurgis or Salvation Witch on summon or revive', () => {
   assert.equal(shouldStartSpecialBgm(special('witch-walpurgis_13')), true);
   assert.equal(shouldStartSpecialBgm(special('witch-salvation_13')), true);
+  assert.equal(shouldStartSpecialBgm(special('witch-walpurgis_13', 'revive')), true);
+  assert.equal(shouldStartSpecialBgm(special('witch-salvation_13', 'revive')), true);
   assert.equal(shouldStartSpecialBgm(special('witch-rose_garden_8')), false);
 });
 
-test('target summon stops normal BGM but waits for the intro to start special BGM', () => {
+test('target appearance stops normal BGM but waits for the intro to start special BGM', () => {
   const bgm = new BattleBgm({ normalSrc: 'normal', specialSrc: 'special', AudioCtor: FakeAudio });
   bgm.startGame();
   bgm.handleEvent(special('witch-walpurgis_13'));
@@ -38,6 +40,15 @@ test('target summon stops normal BGM but waits for the intro to start special BG
   assert.equal(bgm.current, bgm.special);
   assert.equal(bgm.special.loop, true);
   assert.equal(bgm.special.playCount, 1);
+});
+
+test('revived target also stops normal BGM before its intro', () => {
+  const bgm = new BattleBgm({ normalSrc: 'normal', specialSrc: 'special', AudioCtor: FakeAudio });
+  bgm.startGame();
+  bgm.handleEvent(special('witch-salvation_13', 'revive'));
+  assert.equal(bgm.current, null);
+  assert.equal(bgm.normal.paused, true);
+  assert.equal(bgm.special.playCount, 0);
 });
 
 test('a second target summon restarts special BGM after its intro', () => {
