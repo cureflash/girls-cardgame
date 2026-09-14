@@ -6,7 +6,7 @@ export class GameEngine extends BaseGameEngine {
   _sayakaEffectiveThreshold(playerIndex, witchCard) {
     const base = witchCard?.tributeThreshold ?? 0;
     return this.player(playerIndex).character?.id === 'sayaka' && witchCard?.type === CARD_TYPES.WITCH
-      ? Math.max(0, base - 1)
+      ? Math.max(0, base - 3)
       : base;
   }
 
