@@ -49,6 +49,7 @@ test('Sayaka special returns any three graveyard cards to the bottom of the deck
   const adapter = new ThreeCharacterAdapter(engine);
   const p = engine.player(0);
   const cards = createDeck('sayaka').slice(0, 3).map(card => ({ ...card }));
+  const expectedIds = cards.map(card => card.id);
   p.graveyard = cards;
   p.deck = p.deck.slice(0, 9);
   p.specialUsed = false;
@@ -72,7 +73,7 @@ test('Sayaka special returns any three graveyard cards to the bottom of the deck
 
   assert.equal(p.graveyard.length, 0);
   assert.equal(p.deck.length, beforeDeck + 3);
-  assert.deepEqual(p.deck.slice(-3).map(card => card.id), cards.map(card => card.id));
+  assert.deepEqual(p.deck.slice(-3).map(card => card.id), expectedIds);
   assert.equal(p.specialUsed, true);
   assert.equal(engine.state.pendingDecision, null);
   assert.equal(engine.state.turn, 6);
