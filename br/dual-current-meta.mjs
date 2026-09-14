@@ -1,6 +1,7 @@
 import fs from 'node:fs';
-import { PHASES } from '../src/game-engine.js';
+import { PHASES, CARD_TYPES } from '../src/game-engine.js';
 import { chooseEvaluationAction, normalizeEvaluationGenome } from '../src/evaluation-ai.js';
+import { ACTIONS, RL_LIMITS } from '../src/rl-adapter.js';
 import { actionDescriptor, cloneAdapter, createMatch, seededRng } from '../cfr/solver.mjs';
 import { candidateActions, determinizeForPlayer } from './rollout-best-response.mjs';
 
@@ -86,12 +87,38 @@ function evaluateDecision(adapter, perspective, pair, { samples, seed, maxAction
   };
 }
 
+function witchActionCard(adapter, player, action) {
+  const p = adapter.engine.player(player);
+  if (action >= ACTIONS.SUMMON_BASE && action < ACTIONS.ATTACK_BASE) {
+    const offset = action - ACTIONS.SUMMON_BASE;
+    const handIndex = Math.floor(offset / RL_LIMITS.TRIBUTE_MASKS);
+    const card = p.hand[handIndex];
+    if (card?.type === CARD_TYPES.WITCH) return { mode: 'summon', card };
+  }
+  if (action >= ACTIONS.REVIVE_BASE && action < ACTIONS.COUNT) {
+    const card = p.graveyard[action - ACTIONS.REVIVE_BASE];
+    if (card?.type === CARD_TYPES.WITCH) return { mode: 'revive', card };
+  }
+  return null;
+}
+
+function bumpUsage(bucket, info, seen) {
+  if (!info) return;
+  const key = info.card.name;
+  const row = bucket[key] ??= { attack: info.card.attack ?? 0, summons: 0, revives: 0, appearances: 0, gamesSeen: 0 };
+  if (info.mode === 'summon') row.summons += 1;
+  else row.revives += 1;
+  row.appearances += 1;
+  seen.add(key);
+}
+
 function playDualPlanner({ pair, seed, samples, maxActions, minGain }) {
   const adapter = createMatch(seed, Boolean(seed & 1));
   const stats = {
-    madoka: { decisions: 0, deviations: 0, cutoffs: 0, actions: {} },
-    mami: { decisions: 0, deviations: 0, cutoffs: 0, actions: {} },
+    madoka: { decisions: 0, deviations: 0, cutoffs: 0, actions: {}, witchUsage: {} },
+    mami: { decisions: 0, deviations: 0, cutoffs: 0, actions: {}, witchUsage: {} },
   };
+  const seen = { madoka: new Set(), mami: new Set() };
 
   for (let step = 0; step < maxActions && adapter.engine.state.phase !== PHASES.GAME_OVER; step++) {
     const player = adapter.currentPlayer();
@@ -117,7 +144,12 @@ function playDualPlanner({ pair, seed, samples, maxActions, minGain }) {
         bucket.actions[decision.label] = (bucket.actions[decision.label] ?? 0) + 1;
       }
     }
+    bumpUsage(stats[character].witchUsage, witchActionCard(adapter, player, action), seen[character]);
     adapter.applyAction(action, player);
+  }
+
+  for (const character of ['madoka', 'mami']) {
+    for (const name of seen[character]) stats[character].witchUsage[name].gamesSeen += 1;
   }
 
   const winner = adapter.engine.state.winner;
@@ -139,10 +171,10 @@ const minGain = Number(arg('min-gain', 0.05));
 const pair = loadPair(pairFile);
 
 const report = {
-  format: 'girls-cardgame-dual-rollout-current-meta-v1',
+  format: 'girls-cardgame-dual-rollout-current-meta-v2',
   pairFile, games, samples, seed, maxActions, minGain,
-  madoka: { wins: 0, losses: 0, draws: 0, bySeat: { first: { games: 0, wins: 0 }, second: { games: 0, wins: 0 } }, decisions: 0, deviations: 0, cutoffs: 0, actions: {} },
-  mami: { wins: 0, losses: 0, draws: 0, decisions: 0, deviations: 0, cutoffs: 0, actions: {} },
+  madoka: { wins: 0, losses: 0, draws: 0, bySeat: { first: { games: 0, wins: 0 }, second: { games: 0, wins: 0 } }, decisions: 0, deviations: 0, cutoffs: 0, actions: {}, witchUsage: {} },
+  mami: { wins: 0, losses: 0, draws: 0, decisions: 0, deviations: 0, cutoffs: 0, actions: {}, witchUsage: {} },
   terminated: 0,
 };
 
@@ -170,6 +202,13 @@ for (let game = 0; game < games; game++) {
     target.deviations += source.deviations;
     target.cutoffs += source.cutoffs;
     for (const [label, count] of Object.entries(source.actions)) target.actions[label] = (target.actions[label] ?? 0) + count;
+    for (const [name, row] of Object.entries(source.witchUsage)) {
+      const aggregate = target.witchUsage[name] ??= { attack: row.attack, summons: 0, revives: 0, appearances: 0, gamesSeen: 0 };
+      aggregate.summons += row.summons;
+      aggregate.revives += row.revives;
+      aggregate.appearances += row.appearances;
+      aggregate.gamesSeen += row.gamesSeen;
+    }
   }
 }
 
@@ -195,6 +234,7 @@ console.log(JSON.stringify({
   madokaDeviationRate: report.madoka.deviationRate,
   mamiDeviationRate: report.mami.deviationRate,
   cutoffs: { madoka: report.madoka.cutoffs, mami: report.mami.cutoffs },
+  witchUsage: { madoka: report.madoka.witchUsage, mami: report.mami.witchUsage },
   topMadokaDeviations: report.madoka.topDeviations.slice(0, 12),
   topMamiDeviations: report.mami.topDeviations.slice(0, 12),
   output,
