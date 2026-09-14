@@ -3,6 +3,7 @@ import { CharacterAdapter } from '../src/character-adapter.js';
 import { CHARACTERS, createDeck } from '../src/card-data.js';
 import { chooseBaselineAction } from '../src/baseline-ai.js';
 
+// Temporary deterministic benchmark: 500 first-seat + 500 second-seat games per opponent.
 function rngFor(seed) {
   return () => {
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
