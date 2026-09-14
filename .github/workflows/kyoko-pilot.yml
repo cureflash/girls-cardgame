@@ -1,23 +1,49 @@
-name: kyoko-pilot
+name: homura-plus3-ai-retrain-existing
 
 on:
   push:
-    branches: ['**']
+    branches:
+      - analysis/homura-plus3-ai-retrain
 
 jobs:
-  pilot:
-    if: contains(github.event.head_commit.message, '[kyoko-pilot]')
+  core:
+    strategy:
+      fail-fast: false
+      matrix:
+        character: [madoka, mami]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Kyoko three-matchup pilot
-        run: node br/kyoko-pilot.mjs --games 40 --samples 4 --min-gain 0.05 --max-actions 300 --output /tmp/kyoko-pilot.json
-      - name: Upload Kyoko pilot
-        uses: actions/upload-artifact@v4
+      - name: Retrain ${{ matrix.character }}
+        env:
+          CHARACTER: ${{ matrix.character }}
+        run: node tools/train-core-character.mjs
+
+  remaining:
+    strategy:
+      fail-fast: false
+      matrix:
+        character: [sayaka, kyoko, homura]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          name: kyoko-pilot
-          path: /tmp/kyoko-pilot.json
-          retention-days: 7
+          node-version: '22'
+      - name: Retrain ${{ matrix.character }}
+        env:
+          CHARACTER: ${{ matrix.character }}
+        run: node tools/train-dedicated-character.mjs
+
+  nagisa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Retrain Nagisa
+        run: node tools/train-nagisa-v2.mjs
