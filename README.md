@@ -7,34 +7,50 @@
 - デッキ = ライフ。デッキが先に尽きた側が敗北。
 - モンスターゾーンは各5枠。使い魔と魔女で共用。
 - 使い魔は基本モンスター。
-- 魔女は使い魔を生贄にし、生贄の攻撃値合計がカードごとの閾値以上なら召喚可能。
+- 魔女は場の使い魔・魔女と手札の使い魔を生贄にし、生贄の攻撃値合計がカードごとの閾値以上なら召喚可能。手札の魔女は生贄にできない。
 - ターンは `MAIN → BATTLE_START → BATTLE` を基本遷移とする。
-- 召喚とメイン用魔法は `MAIN` だけで行える。
-- 攻撃は `BATTLE` だけで行える。
-- 必殺技は `BATTLE_START` でのみ発動可能。必殺技にはチェーン不可。
-- 必殺技を使った場合、そのターンの `BATTLE` はスキップして直ちに次ターンへ進む。
-- 戦闘中、チェーン可能な魔法がある場合は必ずポップアップで確認する。
-- チェーン解決後は `BATTLE` に復帰する。
+- 召喚とメイン用魔法は `MAIN`、攻撃は `BATTLE` で行う。
+- 必殺技は `BATTLE_START` でのみ発動可能で、各キャラ1デュエル1回。
+- まどか・マミ・さやか・杏子の必殺技は解決後にバトルをスキップしてターン終了。
+- ほむらだけは必殺技使用後もそのまま `BATTLE` へ進める。発動ターン中は相手だけチェーン不可で、ほむら側は強化魔法を使用可能。
+- 戦闘中、チェーン可能な魔法がある場合は確認ウィンドウを開く。チェーン解決後は `BATTLE` に復帰する。
 - 先攻1ターン目は攻撃不可。
 - ダメージを受けたらその枚数をデッキからめくり、`ceil(damage / 3)` 枚を手札、残りを墓地へ送る。
-- 鹿目まどか: 戦闘ダメージを常に1軽減。
-- 巴マミ: 初期手札+1枚。
-- ティロ・フィナーレ: フィールドの使い魔・魔女を全破壊。
-- プルウィア☆マギカ: 自分の墓地の使い魔・魔女から1体を自分フィールドへ蘇生。
+- 盾は直接攻撃では使用不可。戦闘参加中の自分の使い魔・魔女を守り、自分の戦闘ダメージを0にし、チェーンとそのバトルフェイズを終了する。
+
+### キャラクター
+
+- 鹿目まどか: 初期手札5。戦闘ダメージを常に1軽減。`プルウィア☆マギカ` で墓地の使い魔・魔女1体を蘇生。
+- 巴マミ: 初期手札5。常時スキルなし。`ティロ・フィナーレ` で相手フィールドの使い魔・魔女を全破壊。
+- 美樹さやか: 初期手札5。魔女召喚の生贄必要値を3減らす（印刷値8/10/13は実効5/7/10）。必殺技で墓地の任意3枚をデッキへ戻し、デッキ全体をシャッフル。
+- 佐倉杏子: 初期手札4（−1）。必殺技で相手の使い魔・魔女を1体だけ自分の魔女召喚の生贄に含め、不足分を自分の通常生贄で補う。
+- 暁美ほむら: 初期手札8（＋3）。必殺技発動ターンは相手だけチェーン不可。必殺技後もバトル続行可能。
+
+## デッキ外観
+
+キャラクター能力とカード画像セットは分離している。
+
+- プレイヤー側はキャラクターに関係なく、常に `救済の魔女` を含むまどか側画像セットを使用。
+- CPU/NPC側はキャラクターに関係なく、常に `ワルプルギスの夜` を含むマミ側画像セットを使用。
+- 両デッキの機械的な30枚構成・攻撃力・効果・枚数は同一。
 
 ## 中央集権構成
 
-`GameEngine` が唯一のルール authority。フェイズ遷移、合法手判定、戦闘、カード移動、必殺技、ターン進行はすべて `GameEngine` が決定する。
+ブラウザは `src/character-engine.js` を5キャラ共通のルール入口、`src/character-adapter.js` を5キャラ共通のAI/UIアダプタ入口として使用する。既存解析スクリプトとの互換性のため、内部実装の旧ファイル名は残している。
 
-UI と強化学習AIは状態を直接変更せず、`GameEngine` の `can*` 判定を参照し、公開コマンドを呼ぶだけにする。
+UI とAIは状態を直接変更せず、エンジンの合法手判定を参照し、公開コマンドを呼ぶ。
 
 ## 画像差し替え
 
 カード・キャラクター画像パスは `src/card-data.js` に集約。
 
-- `assets/cards/`
+- `assets/cards/madoka/` — プレイヤー側モンスター・魔女画像
+- `assets/cards/mami/` — NPC側モンスター・魔女画像
 - `assets/characters/madoka.webp`
 - `assets/characters/mami.webp`
+- `assets/characters/sayaka.webp`
+- `assets/characters/kyoko.webp`
+- `assets/characters/homura.webp`
 
 ## 起動
 
@@ -50,11 +66,13 @@ python -m http.server 8000
 npm test
 ```
 
+5キャラのブラウザ統合回帰は `tests/five-character-browser.test.mjs` で、初期手札、顔グラ、プレイヤー/CPUの固定画像デッキ、同キャラ対戦時のカードID分離、共通エンジン/アダプタを検証する。
+
 ## 強化学習
 
-強化学習は既存 `GameEngine` の上に `src/rl-adapter.js` を置き、合法手だけを action mask として `MaskablePPO` に渡す。相手の手札内容やデッキ順は観測に含めない。
+強化学習はゲームエンジンの上にアダプタを置き、合法手だけを action mask として `MaskablePPO` に渡す。相手の手札内容やデッキ順は観測に含めない。
 
-フェイズ制約もRL側で再実装せず、`GameEngine.canSummon` / `canEnterBattlePhase` / `canContinueBattlePhase` / `canAttack` / `canUseSpecial` / `canEndTurn` などの判定結果だけを action mask に変換する。
+フェイズ制約もRL側で再実装せず、エンジンの `canSummon` / `canEnterBattlePhase` / `canContinueBattlePhase` / `canAttack` / `canUseSpecial` / `canEndTurn` などの判定結果だけを action mask に変換する。
 
 報酬は勝利 `+1`、敗北 `-1`、途中 `0` のみ。手札補充やダメージなどへの補助報酬は入れていない。
 
@@ -94,24 +112,17 @@ python rl/evaluate.py models/policy_019.zip --games 1000
 python rl/evaluate.py models/policy_019.zip --opponent models/policy_010.zip --games 1000
 ```
 
-評価では勝率に加え、序盤被ダメージ、`3n+1` ダメージの割合、魔女召喚回数、チェーン使用回数、必殺技使用回数などを集計する。
+評価では勝率に加え、序盤被ダメージ、魔女召喚回数、チェーン使用回数、必殺技使用回数などを集計する。
 
 ## RL構成
 
 ```text
-src/game-engine.js   ルールの唯一のauthority
-src/rl-adapter.js    状態ベクトル・固定行動ID・action mask
-rl/server.mjs        Node側ヘッドレス対戦サーバー
-rl/env.py            Gymnasium環境
-rl/train.py          MaskablePPO自己対戦
-rl/evaluate.py       勝率・戦略統計
+src/character-engine.js     5キャラ共通のルール入口
+src/character-adapter.js    5キャラ共通のブラウザ/解析アダプタ入口
+src/game-engine.js          基本ルール実装
+src/rl-adapter.js           状態ベクトル・固定行動ID・action mask
+rl/server.mjs               Node側ヘッドレス対戦サーバー
+rl/env.py                   Gymnasium環境
+rl/train.py                 MaskablePPO自己対戦
+rl/evaluate.py              勝率・戦略統計
 ```
-
-## 未確定のため固定していないもの
-
-- ♦ / ♣ に相当する旧トランプ版固有能力
-- 魔法カードの最終カードプール
-- 正式な魔女・使い魔のカード割り当て
-- 初期手札枚数や通常ドロー枚数など、会話で未確定の数値
-
-試作用カード割り当ては `src/card-data.js` のみで差し替えられる。
