@@ -2,7 +2,7 @@ import { makeEvaluationGenome } from './evaluation-ai.js';
 
 export const SAYAKA_SPECIAL_THRESHOLD = 40;
 export const KYOKO_SPECIAL_THRESHOLD = 140;
-export const HOMURA_SPECIAL_THRESHOLD = 160;
+export const HOMURA_SPECIAL_THRESHOLD = 80;
 
 export const SAYAKA_GENOME = Object.freeze(makeEvaluationGenome({
   projectedDeckAdvantage: 6.026415488963359,
@@ -71,34 +71,34 @@ export const KYOKO_GENOME = Object.freeze(makeEvaluationGenome({
 }, { generation: 5, id: 'kyoko-dedicated-homura-plus3-v1', parents: ['kyoko-g6-child-7-hall-g6'] }));
 
 export const HOMURA_GENOME = Object.freeze(makeEvaluationGenome({
-  projectedDeckAdvantage: 7.7114787015646975,
-  projectedHandAdvantage: 2.0206260875717175,
-  projectedFieldPowerAdvantage: 8.832735247786387,
-  projectedFieldCountAdvantage: 3.4271915118560257,
-  projectedWitchPowerAdvantage: 2,
-  specialReserveAdvantage: 2.5180484621429158,
-  madokaReviveAdvantage: 1.4517166197325042,
-  damageToOpponent: 7.954740846182895,
-  damageToSelf: -8,
-  enemyPowerRemoved: 6.059956294487478,
-  ownPowerLost: -6.8263983851808545,
-  cardsSpent: -1.4938512912182755,
-  summonPower: 3.885825120207566,
-  witchSummon: 1.0741255898761113,
-  bossSummon: 1,
-  drawCards: 1.4769075029247625,
-  specialRemovalPower: 5.106410526290976,
-  specialRemovalCount: 1.9297873266018424,
-  revivePower: 6,
-  salvationRevive: 3.011700870477412,
-  turnEnds: -1.0007959173460508,
-  passAction: -0.5021678998732312,
-  directAttack: 0.9883086718844968,
-  chainBoost: 3.9784186053540562,
-  shieldUse: 1.684060894936111,
-  shieldSavedPower: 6,
-  lethal: 50,
-  selfLethal: -50,
+  projectedDeckAdvantage: 24.440867502979728,
+  projectedHandAdvantage: 0.46169880394419927,
+  projectedFieldPowerAdvantage: 28.886625273131006,
+  projectedFieldCountAdvantage: -8.267405530170516,
+  projectedWitchPowerAdvantage: 8.573620054838042,
+  specialReserveAdvantage: 5.43417404464107,
+  madokaReviveAdvantage: -10.465086741787108,
+  damageToOpponent: 6.126880564723365,
+  damageToSelf: -10.144009515255252,
+  enemyPowerRemoved: -5.914949581503838,
+  ownPowerLost: 4.86119784609231,
+  cardsSpent: 0.5778321315909576,
+  summonPower: -11.707414490648448,
+  witchSummon: 4.68815302690343,
+  bossSummon: 2.805584817898555,
+  drawCards: 2.023435653370245,
+  specialRemovalPower: -8.885788519906779,
+  specialRemovalCount: -8.539363397154665,
+  revivePower: 7.519619018323317,
+  salvationRevive: 4.003713382364565,
+  turnEnds: -4.230437122401153,
+  passAction: 1.6960306172215625,
+  directAttack: 7.166152557557335,
+  chainBoost: -6.872852412609981,
+  shieldUse: -9.494967010516975,
+  shieldSavedPower: 5.218457529190122,
+  lethal: 12.358436567715042,
+  selfLethal: -31.724293748401337,
   terminalWin: 1000,
   terminalLoss: -1000,
-}, { generation: 5, id: 'homura-dedicated-plus3-v1', parents: ['homura-g2-child-8-hall-g2'] }));
+}, { generation: 5, id: 'homura-otk-plus1-v1', parents: ['homura-g7-elite-0'] }));
