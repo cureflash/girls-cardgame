@@ -1,11 +1,10 @@
 # Homura balance results
 
-This report evaluates Akemi Homura after implementing the requested character abilities in the analysis/AI engine.
+This report evaluates Akemi Homura in the analysis/AI engine after removing her passive ability and leaving only the requested chain-lock special.
 
-## Implemented Homura rules
+## Current Homura rules
 
-- Passive: all of Homura's familiars and witches have effective ATK +1.
-- The +1 is used for battle power and tribute value; printed card ATK remains unchanged.
+- Passive: none.
 - Special: once per duel at battle-phase start, the opponent cannot chain for the remainder of that turn.
 - Homura's special does not skip the battle phase and does not end the turn.
 - Homura can still chain her own boost magic after activating the special.
@@ -16,16 +15,16 @@ This report evaluates Akemi Homura after implementing the requested character ab
 
 PASS:
 
-- Homura printed ATK 3 familiar battles as effective ATK 4, then remains printed ATK 3 afterward.
-- Two printed ATK 3 Homura familiars count as effective tribute power 8 and can summon a printed ATK 8 witch.
-- Printed card attack and printed witch tribute thresholds are not permanently modified.
+- Homura has no passive attack bonus: a printed ATK 3 familiar remains effective ATK 3 in battle.
+- Homura has no passive tribute bonus: two printed ATK 3 familiars provide only 6 tribute power and cannot summon a printed ATK 8 witch by themselves.
+- Printed card attack and printed witch tribute thresholds remain unchanged.
 - After Homura activates her special, the battle phase remains available on the same turn.
 - Homura can use her own +2 boost during that battle.
 - An opponent holding Shield cannot chain it during the locked turn.
-- Example regression resolves Homura's printed ATK 3 familiar as 3 + passive 1 + boost 2 = ATK 6 against an opposing ATK 3 familiar.
-- Existing browser syntax, core regression tests, WebP asset test, 300-duel regression, and GA smoke all passed on the Homura implementation.
+- The regression example resolves Homura's printed ATK 3 familiar as 3 + boost 2 = ATK 5 against an opposing ATK 3 familiar.
+- Existing browser syntax, core regression tests, WebP asset test, 300-duel regression, and GA smoke all passed after removing the passive.
 
-## Full focused balance verification
+## Full focused balance verification — no passive
 
 Configuration:
 
@@ -42,49 +41,51 @@ Configuration:
 
 | Matchup | Result | Homura win rate |
 |---|---:|---:|
-| Madoka vs Homura | 33 - 67 | **67%** |
-| Mami vs Homura | 40 - 60 | **60%** |
-| Sayaka vs Homura | 35 - 65 | **65%** |
-| Kyoko vs Homura | 47 - 53 | **53%** |
+| Madoka vs Homura | 58 - 42 | **42%** |
+| Mami vs Homura | 73 - 27 | **27%** |
+| Sayaka vs Homura | 66 - 34 | **34%** |
+| Kyoko vs Homura | 75 - 25 | **25%** |
 
-Across the four matchups, Homura finished **245 - 155**, for an aggregate win rate of **61.25%**.
+Across the four matchups, Homura finished **128 - 272**, for an aggregate win rate of **32.00%**.
 
 ### Seat detail
 
-- vs Madoka: Homura first 32/50, second 35/50.
-- vs Mami: Homura first 30/50, second 30/50.
-- vs Sayaka: Homura first 32/50, second 33/50.
-- vs Kyoko: Homura first 27/50, second 26/50.
+- vs Madoka: Homura first 20/50, second 22/50.
+- vs Mami: Homura first 15/50, second 12/50.
+- vs Sayaka: Homura first 13/50, second 21/50.
+- vs Kyoko: Homura first 11/50, second 14/50.
 
-The result is not explained by seat advantage; Homura performed similarly from both seats in all four matchups.
+The weakness is present from both seats rather than being explained by one seat arrangement.
 
 ### Special usage
 
-- vs Madoka: Homura special used 46 times / 100 games.
-- vs Mami: 52 / 100.
-- vs Sayaka: 60 / 100.
-- vs Kyoko: 43 / 100.
+- vs Madoka: Homura special used 51 times / 100 games.
+- vs Mami: 60 / 100.
+- vs Sayaka: 57 / 100.
+- vs Kyoko: 45 / 100.
 
-The equal-search AI therefore did not simply fire the special whenever it became available. It used the special in roughly half of games and selected it as a situational tactical action.
+The equal-search AI still selected the special situationally, but the special alone was not enough to keep Homura near 50% against Mami, Sayaka, or Kyoko.
 
-## Pilot cross-check
+## Comparison with the removed ATK +1 passive
 
-A separate faster probe using 40 games per matchup and 2 rollout samples produced:
+The previous otherwise-equivalent focused run used the same 100 games per matchup, 50/50 seat split, 4 rollout samples, 0.05 improvement threshold, and 300-action cap, but Homura also had a permanent effective ATK +1 to all familiars and witches, including tribute value.
 
-- vs Madoka: 70%.
-- vs Mami: 55%.
-- vs Sayaka: 67.5%.
-- vs Kyoko: 62.5%.
-- aggregate: 102 / 160 = 63.75%.
+| Matchup | With ATK +1 passive | No passive | Change |
+|---|---:|---:|---:|
+| vs Madoka | 67% | 42% | **-25 pp** |
+| vs Mami | 60% | 27% | **-33 pp** |
+| vs Sayaka | 65% | 34% | **-31 pp** |
+| vs Kyoko | 53% | 25% | **-28 pp** |
+| Aggregate | 61.25% | 32.00% | **-29.25 pp** |
 
-The pilot and the full run agree on the main direction: Homura is substantially above 50% overall, with especially strong results against Madoka and Sayaka. The full run reduces the apparent Kyoko advantage to near-even at 53%.
+This is a large reversal. The prior version was likely overtuned; the no-passive version is now clearly underpowered in this tested environment.
+
+The comparison does not mean the removed passive is worth exactly 29.25 percentage points in isolation, because the passive and special interact and the rollout policy adapts to the changed game states. It does show that removing the passive, with the rest of the tested setup held constant, dramatically reduced Homura's performance.
 
 ## Interpretation
 
-Under the requested rules, Homura is currently a top-tier / likely overtuned character in the tested five-character environment.
+With no passive ability, Homura's once-per-duel chain lock is not sufficient compensation for having no always-on advantage. It can create one strong attack turn by denying Shield and opposing boosts while still allowing Homura's own boosts, but outside that turn Homura plays the shared deck with no numerical or resource advantage.
 
-The strongest current evidence is the full 400-game focused result: 61.25% aggregate, with 67% versus Madoka, 60% versus Mami, 65% versus Sayaka, and only Kyoko remaining approximately even at 53%.
+The current no-passive result is **32.00% aggregate**, with the least unfavorable matchup being Madoka at 42%. Mami, Sayaka, and Kyoko all beat Homura by large margins in this run.
 
-The passive is always active and improves both combat breakpoints and tribute efficiency. The special then creates one turn where defensive Shield and opposing boosts cannot answer Homura's attack, while Homura can still stack her own boosts and continue the battle phase. These effects reinforce each other rather than covering separate weaknesses.
-
-This simulation does not isolate the passive and special separately, so it cannot by itself determine which component contributes more to the excess win rate. An ablation run would be required to measure passive-only and special-only strength independently.
+Therefore the current version is substantially weaker than the tested field. If the design goal is approximately even character balance, the data indicate that the former permanent ATK +1 was too strong, while removing the passive entirely is too large a nerf.
