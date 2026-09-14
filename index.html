@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#15151f">
   <title>魔法少女の決闘 | Magical Duel</title>
-  <link rel="stylesheet" href="./styles.css?v=rules1">
-  <link rel="stylesheet" href="./portraits.css?v=faces1">
+  <link rel="stylesheet" href="./styles.css?v=rules2">
+  <link rel="stylesheet" href="./portraits.css?v=faces2">
 </head>
 <body>
   <header class="header">
@@ -15,11 +15,24 @@
     <button id="new-game" class="quiet">新しいデュエル</button>
   </header>
   <div class="settings">
-    <label>あなた <select id="character"><option value="madoka">鹿目まどか</option><option value="mami">巴マミ</option></select></label>
-    <label>対戦相手 <select id="mode"><option value="cpu">AI</option><option value="local">同じ画面で2人</option></select></label>
+    <label>あなた <select id="character">
+      <option value="madoka">鹿目まどか</option>
+      <option value="mami">巴マミ</option>
+      <option value="sayaka">美樹さやか</option>
+      <option value="kyoko">佐倉杏子</option>
+      <option value="homura">暁美ほむら</option>
+    </select></label>
+    <label>相手キャラ <select id="opponent-character">
+      <option value="mami">巴マミ</option>
+      <option value="madoka">鹿目まどか</option>
+      <option value="sayaka">美樹さやか</option>
+      <option value="kyoko">佐倉杏子</option>
+      <option value="homura">暁美ほむら</option>
+    </select></label>
+    <label>対戦形式 <select id="mode"><option value="cpu">AI</option><option value="local">同じ画面で2人</option></select></label>
     <label>手番 <select id="seat"><option value="first">先攻</option><option value="second">後攻</option></select></label>
     <span id="ai-name">評価AI</span><label class="file-button">学習済みAIを読み込む<input id="policy-file" type="file" accept=".json,application/json"></label>
-    <span class="settings-note">設定は新しいデュエルから</span>
+    <span class="settings-note">AI戦：あなたは救済の魔女デッキ、AIはワルプルギスの夜デッキ。設定は新しいデュエルから。</span>
   </div>
   <div id="notice" role="status" class="notice" hidden></div>
   <main class="layout">
@@ -36,12 +49,20 @@
     <aside class="sidebar">
       <section class="inspection"><h2>カード詳細</h2><div id="card-detail"><p class="muted">カードに触れると、ここに詳細を表示します。</p><div class="detail-placeholder" aria-hidden="true">✦</div></div></section>
       <details class="history" open><summary>デュエルログ</summary><button id="export-log" class="quiet" type="button">解析用JSONを保存</button><ol id="log"></ol></details>
-      <details class="rules"><summary>遊び方</summary><p>山札がライフ。0枚になると敗北します。</p><p>手札を選んで1ターンに1体召喚。魔女は、場の使い魔・魔女と手札の使い魔を生贄にでき、攻撃力合計が必要値以上なら召喚できます。手札の魔女は生贄にできません。</p><p>バトルでは自分のカード → 相手のカード →「攻撃する」。相手の場が空なら直接攻撃できます。各1回、先攻の初ターンは攻撃できません。</p><p>同値なら通常は両方破壊。盾を使うと、その使い魔は戦闘で破壊されず、自分が受ける戦闘ダメージは0になります。発動した時点でチェーンが終了し、この戦闘の解決後にバトルフェイズも終了します。それまでに使った攻撃力アップ魔法は墓地へ送られます。</p><p>必殺技はデュエル中1回だけで、使用するとターンが終わります。</p></details>
+      <details class="rules"><summary>遊び方・キャラ能力</summary>
+        <p>山札がライフ。0枚になると敗北します。1ターン1体召喚、先攻1ターン目は攻撃できません。</p>
+        <p>魔女は場の使い魔・魔女と手札の使い魔を生贄にできます。盾は戦闘ダメージを0にして参加モンスターを守り、その戦闘後にバトルフェイズを終了します。</p>
+        <p>まどか：戦闘ダメージ−1。必殺技で墓地の使い魔・魔女1体を蘇生し、そのターン終了。</p>
+        <p>マミ：常時スキルなし。ティロ・フィナーレで相手の使い魔・魔女を全破壊し、そのターン終了。</p>
+        <p>さやか：魔女の生贄必要値−3。必殺技で墓地の任意3枚をデッキに戻して全体をシャッフルし、そのターン終了。</p>
+        <p>杏子：初期手札−1。必殺技で相手の使い魔・魔女を1体だけ生贄に含めて自分の魔女を召喚し、そのターン終了。</p>
+        <p>ほむら：初期手札＋3。必殺技を使ったターンは相手だけチェーン不可。ほむらはそのままバトルへ進み、自分の強化魔法は使えます。</p>
+      </details>
     </aside>
   </main>
   <div id="effect-layer" aria-hidden="true"></div>
   <dialog id="decision" aria-labelledby="decision-title"><div id="modal"></div></dialog>
   <dialog id="restart"><h2>新しいデュエルを始めますか？</h2><p>現在の対戦は終了します。</p><div class="actions"><button id="cancel-restart" class="quiet">続ける</button><button id="confirm-restart" class="primary">新しく始める</button></div></dialog>
-  <script type="module" src="./src/app.js?v=duel-log1"></script>
+  <script type="module" src="./src/app.js?v=fivechars1"></script>
 </body>
 </html>
