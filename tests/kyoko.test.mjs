@@ -58,6 +58,7 @@ test('Kyoko and Homura decks are mechanically identical to the shared deck', () 
   assert.equal(base.length, 30);
   assert.equal(CHARACTERS.kyoko.passive, 'なし');
   assert.equal(CHARACTERS.homura.passive, '使い魔・魔女の攻撃力＋1');
+  assert.equal(CHARACTERS.homura.special, '発動ターン中、相手はチェーン不可');
   assert.deepEqual([...new Set(createDeck('kyoko').filter(card => card.type === 'witch').map(card => card.tributeThreshold))].sort((a, b) => a - b), [8, 10, 13]);
   assert.deepEqual([...new Set(createDeck('homura').filter(card => card.type === 'witch').map(card => card.tributeThreshold))].sort((a, b) => a - b), [8, 10, 13]);
 });
@@ -212,12 +213,41 @@ test('Homura passive counts two printed ATK 3 familiars as eight tribute power f
   assert.deepEqual(own.graveyard.map(card => card.attack).sort((a, b) => a - b), [3, 3]);
 });
 
-test('Homura currently has no special move', () => {
+test('Homura special keeps battle available, allows her boost chain, and prevents the opponent from chaining', () => {
   const engine = makeHomuraEngine('mami');
-  engine.state.phase = PHASES.BATTLE_START;
-  engine.state.activePlayer = 0;
-  engine.state.priorityPlayer = 0;
-  engine.state.pendingDecision = null;
-  engine.state.turn = 5;
-  assert.equal(engine.canUseSpecial(0), false);
+  const own = engine.player(0);
+  const opponent = engine.player(1);
+  const homuraDeck = createDeck('homura');
+  const mamiDeck = createDeck('mami');
+  const boost = { ...homuraDeck.find(card => card.type === 'magic' && card.effect === 'boost' && card.value === 2) };
+  const shield = { ...mamiDeck.find(card => card.type === 'magic' && card.effect === 'nullifyDamage') };
+  own.hand = [boost];
+  opponent.hand = [shield];
+  own.field = [firstBy(homuraDeck, 'familiar', 3), null, null, null, null];
+  opponent.field = [firstBy(mamiDeck, 'familiar', 3), null, null, null, null];
+  setBattleStart(engine);
+
+  assert.equal(engine.canUseSpecial(0), true);
+  engine.activateSpecial(0);
+  assert.equal(own.specialUsed, true);
+  assert.equal(engine.state.turn, 5);
+  assert.equal(engine.state.phase, PHASES.BATTLE_START);
+  assert.equal(engine.canContinueBattlePhase(0), true);
+
+  engine.continueBattlePhase(0);
+  engine.attack(0, 0, 0);
+  assert.equal(engine.state.pendingDecision?.type, 'CHAIN_RESPONSE');
+  assert.equal(engine.state.pendingDecision?.player, 0);
+  assert.deepEqual(engine.state.pendingDecision?.options, [boost.id]);
+
+  engine.respondChain(0, boost.id);
+
+  assert.equal(opponent.hand.some(card => card.id === shield.id), true);
+  assert.equal(own.graveyard.some(card => card.id === boost.id), true);
+  assert.equal(opponent.field[0], null);
+  const battleEnd = engine.state.events.findLast(event => event.type === 'battleEnd');
+  assert.equal(battleEnd?.attackValue, 6);
+  assert.equal(battleEnd?.defendValue, 3);
+  assert.equal(engine.state.turn, 5);
+  assert.equal(engine.state.activePlayer, 0);
 });
