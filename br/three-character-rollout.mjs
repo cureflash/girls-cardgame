@@ -20,7 +20,8 @@ function cloneAdapter(adapter) {
     rng: () => 0.5,
   });
   engine.state = structuredClone(adapter.engine.state);
-  engine.rng = adapter.engine.rng;
+  // Do not share the live game's stateful RNG closure across hypothetical candidates.
+  engine.rng = () => 0.5;
   const clone = new ThreeCharacterAdapter(engine);
   clone.eventCursor = adapter.eventCursor;
   clone.stats = structuredClone(adapter.stats);
@@ -79,7 +80,7 @@ function determinizeForPlayer(adapter, perspective, rng) {
     ...chainCardsFor(sampled, opponentIndex),
     ...pendingSelectedFor(sampled, opponentIndex),
   ];
-  const oppUnseen = shuffle(removeKnown(createDeck(opp.character.id), oppPublic), rng);
+  const oppUnseen = shuffle(removeKnown(createDeck(opp.character.id), rng ? oppPublic : oppPublic), rng);
   const hiddenCount = opp.hand.length + opp.deck.length;
   if (oppUnseen.length !== hiddenCount) throw new Error(`Opponent unseen mismatch ${opp.character.id}: ${oppUnseen.length} vs ${hiddenCount}`);
   opp.hand = oppUnseen.slice(0, opp.hand.length).map(card => ({ ...card }));
@@ -140,9 +141,12 @@ function evaluateDecision(adapter, perspective, { samples, seed, maxActions, min
 
   const rows = new Map(candidates.map(item => [item.action, { ...item, total: 0, cutoffs: 0 }]));
   for (let sample = 0; sample < samples; sample++) {
-    const world = determinizeForPlayer(adapter, perspective, mulberry32((seed + sample * 2654435761) >>> 0));
+    const sampleSeed = (seed + sample * 2654435761) >>> 0;
+    const world = determinizeForPlayer(adapter, perspective, mulberry32(sampleSeed));
     for (const candidate of candidates) {
       const child = cloneAdapter(world);
+      // Each candidate receives an independent RNG instance initialized from the same sample seed.
+      child.engine.rng = mulberry32((sampleSeed ^ 0xa5a5a5a5) >>> 0);
       if (!child.legalActions(perspective).includes(candidate.action)) throw new Error('Candidate became illegal after determinization.');
       child.applyAction(candidate.action, perspective);
       const result = rollout(child, perspective, maxActions, mulberry32((seed ^ candidate.action ^ (sample * 7919)) >>> 0));
@@ -249,11 +253,11 @@ for (const pair of pairResults) {
 for (const row of Object.values(aggregate)) row.winRate = row.wins / row.games;
 
 const report = {
-  format: 'girls-cardgame-three-character-mutual-rollout-v1',
+  format: 'girls-cardgame-three-character-mutual-rollout-v2',
   policy: 'shared-default-evaluation plus equal hidden-information conservative rollout for all characters',
   gamesPerPair: games, samples, seed, maxActions, minGain,
-  deckCondition: 'Sayaka mirrors Madoka 30-card numerical pool; character abilities differ.',
-  sayakaRule: { passive: 'witch tribute threshold -1', special: 'return any 3 graveyard cards to bottom of deck, then end turn' },
+  deckCondition: 'All three characters use mechanically identical 30-card decks; only names/art skins differ. Sayaka analysis art/name mapping currently reuses Madoka until dedicated assets are supplied.',
+  sayakaRule: { passive: 'effective witch tribute threshold -1 as a character ability', special: 'return any 3 graveyard cards to deck, shuffle the whole deck, then end turn' },
   pairResults, aggregate,
 };
 fs.writeFileSync(output, `${JSON.stringify(report, null, 2)}\n`);
