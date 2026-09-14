@@ -1,5 +1,6 @@
 import { ACTIVE_GENOMES } from './evolved-genome.js?v=g999';
 import { DEFAULT_GENOME, chooseEvaluationAction, normalizeEvaluationGenome } from './evaluation-ai.js';
+import { chooseNagisaAction } from './nagisa-ai.js';
 
 const publishedGenomes = Object.freeze({
   madoka: ACTIVE_GENOMES?.madoka ? normalizeEvaluationGenome(ACTIVE_GENOMES.madoka) : DEFAULT_GENOME,
@@ -12,7 +13,10 @@ function genomeFor(adapter, player) {
 }
 
 // Built-in browser opponent. Madoka and Mami use separately evolved evaluation policies.
+// Nagisa's staged forced-battle decisions use a dedicated board evaluator.
 export function chooseBaselineAction(adapter, player = adapter.currentPlayer()) {
+  const nagisaAction = chooseNagisaAction(adapter, player);
+  if (nagisaAction !== null) return nagisaAction;
   return chooseEvaluationAction(adapter, player, genomeFor(adapter, player));
 }
 
