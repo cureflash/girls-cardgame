@@ -129,7 +129,6 @@ test('Homura attack-up cards use their printed value without the removed +2 pass
   enterBattleAsPlayer1(e);
   e.attack(1, 0, 0);
   e.respondChain(1, 'boost');
-  e.respondChain(1, null);
 
   const battle = e.state.events.filter(event => event.type === 'battleEnd').at(-1);
   assert.equal(battle?.attackValue, 5);
