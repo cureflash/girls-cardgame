@@ -37,7 +37,7 @@ test('Madoka, Mami, and Sayaka decks have identical mechanical contents', () => 
   assert.deepEqual(sayaka, madoka);
 });
 
-test('Sayaka passive reduces the effective witch tribute requirement by one without changing card stats', () => {
+test('Sayaka passive reduces the effective witch tribute requirement by three without changing card stats', () => {
   const deck = createDeck('sayaka');
   const thresholds = deck.filter(card => card.type === 'witch').map(card => [card.attack, card.tributeThreshold]);
   assert.deepEqual([...new Set(thresholds.map(JSON.stringify))].map(JSON.parse).sort((a, b) => a[0] - b[0]), [
@@ -50,9 +50,8 @@ test('Sayaka passive reduces the effective witch tribute requirement by one with
   const p = engine.player(0);
   const source = createDeck('sayaka');
   const witch8 = source.find(card => card.type === 'witch' && card.attack === 8);
-  const familiar3 = source.find(card => card.type === 'familiar' && card.attack === 3);
-  const familiar4 = source.find(card => card.type === 'familiar' && card.attack === 4);
-  p.hand = [{ ...witch8 }, { ...familiar3 }, { ...familiar4 }];
+  const familiar5 = source.find(card => card.type === 'familiar' && card.attack === 5);
+  p.hand = [{ ...witch8 }, { ...familiar5 }];
   p.field = Array(5).fill(null);
   p.graveyard = [];
   p.summonedThisTurn = false;
@@ -62,10 +61,10 @@ test('Sayaka passive reduces the effective witch tribute requirement by one with
   engine.state.pendingDecision = null;
 
   const plans = engine.validTributeSets(0, p.hand[0]);
-  const sevenPointPlan = plans.find(plan => plan.total === 7 && plan.handIds.length === 2);
-  assert.ok(sevenPointPlan);
+  const fivePointPlan = plans.find(plan => plan.total === 5 && plan.handIds.length === 1);
+  assert.ok(fivePointPlan);
   assert.equal(engine.canSummon(0, p.hand[0].id), true);
-  engine.summon(0, p.hand[0].id, sevenPointPlan.handIds.map(id => ({ zone: 'hand', id })));
+  engine.summon(0, p.hand[0].id, fivePointPlan.handIds.map(id => ({ zone: 'hand', id })));
   const summoned = p.field.find(Boolean);
   assert.equal(summoned.attack, 8);
   assert.equal(summoned.tributeThreshold, 8);
