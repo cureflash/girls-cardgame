@@ -24,6 +24,7 @@ export class BattleSfx {
       [SOUND_KEYS.FAMILIAR_SUMMON]: new AudioCtor(familiarSummonSrc),
       [SOUND_KEYS.SHIELD_BLOCK]: new AudioCtor(shieldBlockSrc),
     };
+    this.pending = null;
 
     for (const audio of Object.values(this.sounds)) {
       audio.loop = false;
@@ -31,34 +32,41 @@ export class BattleSfx {
     }
   }
 
-  _play(audio) {
+  _play(sound) {
+    const audio = this.sounds[sound];
     audio.pause();
     audio.currentTime = 0;
+    this.pending = null;
     try {
       const result = audio.play();
-      if (result?.catch) result.catch(() => {});
+      if (result?.catch) result.catch(() => { this.pending = sound; });
     } catch {
-      // Browsers may block playback until the player interacts with the page.
+      this.pending = sound;
     }
   }
 
   handleEvent(event) {
     const sound = soundForDuelEvent(event);
-    if (!sound) return;
-    this._play(this.sounds[sound]);
+    if (sound) this._play(sound);
+  }
+
+  unlock() {
+    if (this.pending) this._play(this.pending);
   }
 }
 
 function bootstrap() {
-  if (typeof window === 'undefined' || typeof Audio === 'undefined') return;
+  if (typeof window === 'undefined' || typeof document === 'undefined' || typeof Audio === 'undefined') return;
 
   const sfx = new BattleSfx({
-    damageSrc: './assets/audio/damage.mp3?v=sfx1',
-    familiarSummonSrc: './assets/audio/familiar-summon.mp3?v=sfx1',
-    shieldBlockSrc: './assets/audio/shield-block.mp3?v=sfx1',
+    damageSrc: './assets/audio/damage.mp3?v=sfx2',
+    familiarSummonSrc: './assets/audio/familiar-summon.mp3?v=sfx2',
+    shieldBlockSrc: './assets/audio/shield-block.mp3?v=sfx2',
   });
 
   window.addEventListener('duel:event', event => sfx.handleEvent(event.detail));
+  document.addEventListener('pointerdown', () => sfx.unlock(), { passive: true });
+  document.addEventListener('keydown', () => sfx.unlock());
 }
 
 bootstrap();

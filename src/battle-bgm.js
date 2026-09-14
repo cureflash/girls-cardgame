@@ -14,6 +14,10 @@ export class BattleBgm {
     this.special.preload = 'auto';
     this.current = null;
     this.blocked = false;
+
+    this.special.addEventListener?.('ended', () => {
+      if (this.current === this.special) this._restartSpecial();
+    });
   }
 
   _reset(audio) {
@@ -36,6 +40,12 @@ export class BattleBgm {
     }
   }
 
+  _restartSpecial() {
+    this.special.pause();
+    this.special.currentTime = 0;
+    this._play(this.special);
+  }
+
   startGame() {
     this._reset(this.normal);
     this._reset(this.special);
@@ -43,14 +53,22 @@ export class BattleBgm {
   }
 
   handleEvent(event) {
-    if (!shouldStartSpecialBgm(event) || this.current === this.special) return;
+    if (!shouldStartSpecialBgm(event)) return;
+
+    if (this.current === this.special) {
+      if (this.special.paused || this.special.ended) this._restartSpecial();
+      return;
+    }
+
     this._reset(this.normal);
     this._reset(this.special);
     this._play(this.special);
   }
 
   unlock() {
-    if (this.current?.paused && !this.current.ended) this._play(this.current);
+    if (!this.current?.paused) return;
+    if (this.current.ended) this.current.currentTime = 0;
+    this._play(this.current);
   }
 }
 
@@ -58,8 +76,8 @@ function bootstrap() {
   if (typeof window === 'undefined' || typeof document === 'undefined' || typeof Audio === 'undefined') return;
 
   const bgm = new BattleBgm({
-    normalSrc: './assets/audio/Battle_normal.mp3?v=bgm1',
-    specialSrc: './assets/audio/Battle_special.mp4?v=bgm1',
+    normalSrc: './assets/audio/Battle_normal.mp3?v=bgm2',
+    specialSrc: './assets/audio/Battle_special.mp4?v=bgm2',
   });
 
   bgm.startGame();
