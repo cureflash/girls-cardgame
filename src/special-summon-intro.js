@@ -124,7 +124,7 @@ export class SpecialSummonIntro {
     overlay.innerHTML = `
       <div class="special-intro-floor"></div>
       <div class="special-intro-pink"></div>
-      <img class="special-intro-enemy" src="./assets/special-intro/walpurgis.png?v=special-intro1" alt="">
+      <img class="special-intro-enemy" src="./assets/special-intro/walpurgis.webp?v=special-intro1" alt="">
       <div class="special-intro-title"><div class="special-intro-brush"><img class="special-intro-runes" src="./assets/special-intro/walpurgis-runes.png?v=special-intro1" alt=""></div></div>
       <div class="special-intro-white"></div>
       <div class="special-intro-negative"></div>`;
