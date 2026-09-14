@@ -193,14 +193,41 @@ function chainCardForAction(adapter, playerIndex, action) {
   return adapter.engine.player(playerIndex).hand[action - ACTIONS.CHAIN_BASE] ?? null;
 }
 
+function homuraOtkUpperBound(engine, playerIndex) {
+  const self = engine.player(playerIndex);
+  const opp = engine.player(engine.opponent(playerIndex));
+  const fieldPower = self.field
+    .filter(card => isMonster(card) && card.attackedTurn !== engine.state.turn)
+    .reduce((sum, card) => sum + (card.attack ?? 0), 0);
+  const freePower = self.field.includes(null)
+    ? Math.max(0, ...self.hand.filter(isMonster).map(card => card.attack ?? 0))
+    : 0;
+  const boostPower = self.hand
+    .filter(card => card?.effect === 'boost')
+    .reduce((sum, card) => sum + (card.value ?? 0), 0);
+  return fieldPower + freePower + boostPower >= opp.deck.length;
+}
+
 function homuraOtkSearchActions(adapter, playerIndex) {
   const engine = adapter.engine;
   const legal = adapter.legalActions(playerIndex);
   const pending = engine.state.pendingDecision;
 
   if (pending?.type === 'CHAIN_RESPONSE') {
+    const usedBoostIds = engine.state.chain
+      .filter(item => item.player === playerIndex && item.card?.effect === 'boost')
+      .map(item => item.card.id)
+      .sort();
+    const lastBoostId = usedBoostIds.at(-1) ?? null;
     return legal
-      .filter(action => action === ACTIONS.PASS || chainCardForAction(adapter, playerIndex, action)?.effect === 'boost')
+      .filter(action => {
+        if (action === ACTIONS.PASS) return true;
+        const card = chainCardForAction(adapter, playerIndex, action);
+        if (card?.effect !== 'boost') return false;
+        // Boost order is irrelevant inside one chain. Requiring one canonical ID order
+        // explores every boost subset once instead of every permutation of the same subset.
+        return lastBoostId === null || card.id > lastBoostId;
+      })
       .sort((a, b) => {
         if (a === ACTIONS.PASS) return -1;
         if (b === ACTIONS.PASS) return 1;
@@ -260,6 +287,7 @@ export function findHomuraOtkLine(adapter, playerIndex = adapter.currentPlayer()
   const engine = adapter.engine;
   if (engine.player(playerIndex).character?.id !== 'homura') return null;
   if (!adapter.legalActions(playerIndex).includes(ACTIONS.SPECIAL)) return null;
+  if (!homuraOtkUpperBound(engine, playerIndex)) return null;
 
   const next = cloneAdapterForSearch(adapter);
   try {
