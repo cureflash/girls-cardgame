@@ -1,7 +1,8 @@
 const SPECIAL_WITCH_CODES = new Set(['witch-walpurgis_13', 'witch-salvation_13']);
 
 export function shouldStartSpecialBgm(event) {
-  return event?.type === 'summon' && SPECIAL_WITCH_CODES.has(event.card?.code);
+  return ['summon', 'revive'].includes(event?.type)
+    && SPECIAL_WITCH_CODES.has(event.card?.code);
 }
 
 export class BattleBgm {
@@ -91,8 +92,8 @@ function bootstrap() {
   if (typeof window === 'undefined' || typeof document === 'undefined' || typeof Audio === 'undefined') return;
 
   const bgm = new BattleBgm({
-    normalSrc: './assets/audio/Battle_normal.mp3?v=bgm4',
-    specialSrc: './assets/audio/Battle_special.mp4?v=bgm4',
+    normalSrc: './assets/audio/Battle_normal.mp3?v=bgm5',
+    specialSrc: './assets/audio/Battle_special.mp4?v=bgm5',
   });
 
   bgm.startGame();
