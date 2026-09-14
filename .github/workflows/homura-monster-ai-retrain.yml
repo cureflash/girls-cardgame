@@ -1,0 +1,49 @@
+name: homura-plus3-ai-retrain
+
+on:
+  push:
+    branches:
+      - analysis/homura-plus3-ai-retrain
+
+jobs:
+  core:
+    strategy:
+      fail-fast: false
+      matrix:
+        character: [madoka, mami]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Retrain ${{ matrix.character }}
+        env:
+          CHARACTER: ${{ matrix.character }}
+        run: node tools/train-core-character.mjs
+
+  remaining:
+    strategy:
+      fail-fast: false
+      matrix:
+        character: [sayaka, kyoko, homura]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Retrain ${{ matrix.character }}
+        env:
+          CHARACTER: ${{ matrix.character }}
+        run: node tools/train-dedicated-character.mjs
+
+  nagisa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Retrain Nagisa
+        run: node tools/train-nagisa-v2.mjs
