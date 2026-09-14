@@ -1,4 +1,4 @@
-import { GameEngine, CARD_TYPES, PHASES } from './character-engine.js?v=homura3';
+import { GameEngine, CARD_TYPES, PHASES } from './character-engine.js?v=homura4';
 import { CHARACTERS, createPlayerDeck, createNpcDeck } from './card-data.js';
 import { CharacterAdapter } from './character-adapter.js?v=nagisa2';
 import { RULES_VERSION } from './rl-adapter.js';
@@ -233,11 +233,11 @@ function renderPlayer(index, selector) {
   if (selector === '#bottom-player') {
     const info = node('div', 'hand-heading');
     const extraHomuraSummon = p.character.id === 'homura'
-      && s.homuraExtraWitchSummon?.player === index
-      && s.homuraExtraWitchSummon?.turn === s.turn;
+      && s.homuraExtraMonsterSummon?.player === index
+      && s.homuraExtraMonsterSummon?.turn === s.turn;
     info.append(
       node('b', '', '手札'),
-      node('span', '', extraHomuraSummon ? '必殺技で魔女1体を追加召喚可能' : p.summonedThisTurn && index === s.activePlayer ? 'このターンの召喚は使用済み' : '召喚は1ターンに1体'),
+      node('span', '', extraHomuraSummon ? '必殺技で使い魔・魔女1体を追加召喚可能' : p.summonedThisTurn && index === s.activePlayer ? 'このターンの召喚は使用済み' : '召喚は1ターンに1体'),
       node('span', '', `必殺技：${p.specialUsed ? '使用済み' : '未使用'}`),
     );
     const hand = node('div', 'hand'); p.hand.forEach(card => hand.append(cardButton(card, index, 'hand')));
@@ -279,11 +279,12 @@ function renderActions() {
       const self = engine.player(p);
       const homuraLockActive = self.character.id === 'homura' && self.specialUsed && s.homuraChainLockTurn === s.turn;
       const homuraExtraSummon = self.character.id === 'homura'
-        && s.homuraExtraWitchSummon?.player === p
-        && s.homuraExtraWitchSummon?.turn === s.turn;
-      if (homuraExtraSummon && card?.type === CARD_TYPES.WITCH) hint = `${card.name}を生贄なしで追加召喚できます。使わない場合はそのままバトルを開始してください。`;
-      else if (homuraExtraSummon) hint = '必殺技発動中：手札の魔女1体を生贄なしで追加召喚できます。使わない場合はそのままバトル開始できます。';
-      else if (homuraLockActive) hint = '必殺技発動中：このターンは相手だけチェーン不可。ほむら側の強化魔法は使用できます。';
+        && s.homuraExtraMonsterSummon?.player === p
+        && s.homuraExtraMonsterSummon?.turn === s.turn;
+      const homuraExtraCard = homuraExtraSummon && [CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(card?.type);
+      if (homuraExtraCard) hint = `${card.name}を生贄なしで追加召喚できます。使わない場合はそのままバトルを開始してください。`;
+      else if (homuraExtraSummon) hint = '必殺技発動中：手札の使い魔・魔女1体を生贄なしで追加召喚できます。使わない場合はそのままバトル開始できます。';
+      else if (homuraLockActive) hint = '必殺技発動中：このターンは相手だけチェーン不可。';
       else if (self.specialUsed) hint = '必殺技は使用済みです。バトルを始めましょう。';
       else if (self.character.id === 'nagisa') hint = '必殺技で自分・相手の全モンスターを何体でも順番に操作できます。相手の場が空になるまで直接攻撃はできません。';
       else if (specialEndsTurn(self.character.id)) hint = '必殺技を使うと、このターンのバトルはスキップしてターン終了します。';
@@ -291,12 +292,12 @@ function renderActions() {
       const battleStartActions = [
         button(self.character.special, () => perform(() => engine.activateSpecial(p), { type: 'special', name: self.character.special }), 'special', !engine.canUseSpecial(p)),
       ];
-      if (homuraExtraSummon && card?.type === CARD_TYPES.WITCH) {
+      if (homuraExtraCard) {
         battleStartActions.push(button(
-          '魔女を生贄なしで追加召喚',
+          '生贄なしで追加召喚',
           () => perform(
             () => engine.summon(p, card.id, []),
-            { type: 'homura-extra-witch-summon', cardId: card.id, cardName: card.name },
+            { type: 'homura-extra-monster-summon', cardId: card.id, cardName: card.name },
           ),
           'primary',
           !engine.canSummon(p, card.id),
