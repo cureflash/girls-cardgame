@@ -1,3 +1,3 @@
-import { ThreeCharacterAdapter } from './three-character-adapter.js';
+import { NagisaAdapter } from './nagisa-adapter.js';
 
-export class CharacterAdapter extends ThreeCharacterAdapter {}
+export class CharacterAdapter extends NagisaAdapter {}

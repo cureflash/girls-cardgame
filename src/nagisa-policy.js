@@ -1,0 +1,40 @@
+import { makeEvaluationGenome } from './evaluation-ai.js';
+
+export const NAGISA_SPECIAL_THRESHOLD = 320;
+
+export const NAGISA_GENOME = Object.freeze(makeEvaluationGenome({
+  projectedDeckAdvantage: 16.554667838630266,
+  projectedHandAdvantage: 1.086400831642067,
+  projectedFieldPowerAdvantage: 36.92481039289993,
+  projectedFieldCountAdvantage: -7.949187869828085,
+  projectedWitchPowerAdvantage: 9.635805848713856,
+  specialReserveAdvantage: 7.7109701795254555,
+  madokaReviveAdvantage: -12.122979970748718,
+  damageToOpponent: 3.4011141179295308,
+  damageToSelf: -11.877662955353253,
+  enemyPowerRemoved: -5.910811512890027,
+  ownPowerLost: 4.847057941253277,
+  cardsSpent: -5.974157238379121,
+  summonPower: 8.240503844239312,
+  witchSummon: -2.946133846693288,
+  bossSummon: 3.3800787215582027,
+  drawCards: -9.813811802305281,
+  specialRemovalPower: -9.973533074092584,
+  specialRemovalCount: 5.589306282905429,
+  revivePower: 5.767620899707087,
+  salvationRevive: 5.525494759817864,
+  turnEnds: -5.8766462553443715,
+  passAction: 0.9164542547859716,
+  directAttack: 8.192147899799632,
+  chainBoost: -9.018056337750101,
+  shieldUse: -3.493230361142347,
+  shieldSavedPower: 4.878130710234922,
+  lethal: -5.756587416220944,
+  selfLethal: -19.09975514115179,
+  terminalWin: 1000,
+  terminalLoss: -1000,
+}, {
+  generation: 5,
+  id: 'nagisa-dedicated-homura-plus3-v1',
+  parents: ['nagisa-v2-g7-elite-1'],
+}));

@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#15151f">
   <title>魔法少女の決闘 | Magical Duel</title>
   <link rel="stylesheet" href="./styles.css?v=rules2">
-  <link rel="stylesheet" href="./portraits.css?v=faces4">
+  <link rel="stylesheet" href="./portraits.css?v=faces5">
 </head>
 <body>
   <header class="header">
@@ -21,6 +21,7 @@
       <option value="sayaka">美樹さやか</option>
       <option value="kyoko">佐倉杏子</option>
       <option value="homura">暁美ほむら</option>
+      <option value="nagisa">百江なぎさ</option>
     </select></label>
     <label>相手キャラ <select id="opponent-character">
       <option value="mami">巴マミ</option>
@@ -28,6 +29,7 @@
       <option value="sayaka">美樹さやか</option>
       <option value="kyoko">佐倉杏子</option>
       <option value="homura">暁美ほむら</option>
+      <option value="nagisa">百江なぎさ</option>
     </select></label>
     <label>対戦形式 <select id="mode"><option value="cpu">AI</option><option value="local">同じ画面で2人</option></select></label>
     <label>手番 <select id="seat"><option value="first">先攻</option><option value="second">後攻</option></select></label>
@@ -51,19 +53,20 @@
       <details class="history" open><summary>デュエルログ</summary><button id="export-log" class="quiet" type="button">解析用JSONを保存</button><ol id="log"></ol></details>
       <details class="rules"><summary>遊び方・キャラ能力</summary>
         <p>山札がライフ。0枚になると敗北します。1ターン1体召喚、先攻1ターン目は攻撃できません。</p>
-        <p>魔女は場の使い魔・魔女と手札の使い魔を生贄にできます。盾は戦闘ダメージを0にして参加モンスターを守り、その戦闘後にバトルフェイズを終了します。</p>
+        <p>魔女は場の使い魔・魔女と手札の使い魔を生贄にできます。盾を使うと、その戦闘では双方の参加モンスターが戦闘破壊されず、盾を使った側が受ける戦闘ダメージは0になります。戦闘解決後にバトルフェイズを終了します。</p>
         <p>まどか：戦闘ダメージ−1。必殺技で墓地の使い魔・魔女1体を蘇生し、そのターン終了。</p>
-        <p>マミ：常時スキルなし。ティロ・フィナーレで相手の使い魔・魔女を全破壊し、そのターン終了。</p>
+        <p>マミ：初期手札−1。ティロ・フィナーレで相手の使い魔・魔女を全破壊し、そのターン終了。</p>
         <p>さやか：魔女の生贄必要値−3。必殺技で墓地の任意3枚をデッキに戻して全体をシャッフルし、そのターン終了。</p>
-        <p>杏子：初期手札−1。必殺技で相手の使い魔・魔女を1体だけ生贄に含めて自分の魔女を召喚し、そのターン終了。</p>
-        <p>ほむら：初期手札＋3。必殺技を使ったターンは相手だけチェーン不可。ほむらはそのままバトルへ進み、自分の強化魔法は使えます。</p>
+        <p>杏子：パッシブなし。必殺技で相手の使い魔・魔女を1体だけ生贄に含めて自分の魔女を召喚し、そのターン終了。</p>
+        <p>ほむら：初期手札＋1。必殺技を使うと、戦闘前に手札の使い魔・魔女1体を生贄なしで追加召喚でき、そのターンは相手だけチェーン不可。ほむらはそのままバトルへ進めます。</p>
+        <p>なぎさ：自分の使い魔が戦闘で破壊される場合、1ターンに1度だけ手札に戻します。必殺技で自分・相手フィールドの使い魔・魔女を何体でも順番に操作し、各1回ずつ強制攻撃させられます。相手フィールドが1体だけなら、その1体を操って相手へ直接攻撃できます。強制戦闘では防御側は攻撃アップ・盾を使えず、なぎさだけが使用できます。任意の時点で強制戦闘を終了できます。</p>
       </details>
     </aside>
   </main>
   <div id="effect-layer" aria-hidden="true"></div>
   <dialog id="decision" aria-labelledby="decision-title"><div id="modal"></div></dialog>
   <dialog id="restart"><h2>新しいデュエルを始めますか？</h2><p>現在の対戦は終了します。</p><div class="actions"><button id="cancel-restart" class="quiet">続ける</button><button id="confirm-restart" class="primary">新しく始める</button></div></dialog>
-  <script type="module" src="./src/app.js?v=fivechars1"></script>
+  <script type="module" src="./src/app.js?v=merge1"></script>
   <script type="module" src="./src/battle-bgm.js?v=bgm3"></script>
   <script type="module" src="./src/battle-sfx.js?v=sfx4"></script>
 </body>

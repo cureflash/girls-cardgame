@@ -16,7 +16,7 @@ jobs:
       - name: Browser app syntax
         run: node --check src/app.js
       - name: Core regression tests
-        run: node --test tests/engine.test.mjs tests/hand-tributes.test.mjs tests/rl-adapter.test.mjs tests/evaluation-ai.test.mjs tests/genetics.test.mjs tests/character-ai.test.mjs tests/duel-log.test.mjs tests/cfr.test.mjs tests/best-response.test.mjs tests/sayaka.test.mjs tests/kyoko.test.mjs
+        run: node --test tests/engine.test.mjs tests/hand-tributes.test.mjs tests/rl-adapter.test.mjs tests/evaluation-ai.test.mjs tests/genetics.test.mjs tests/character-ai.test.mjs tests/shield-opening.test.mjs tests/opening-hand-balance.test.mjs tests/homura.test.mjs tests/duel-log.test.mjs tests/cfr.test.mjs tests/best-response.test.mjs tests/sayaka.test.mjs tests/kyoko.test.mjs
       - name: WebP card assets
         run: node --test --test-name-pattern='all gameplay card art uses non-placeholder WebP assets' tests/integration.test.mjs
       - name: 300-duel regression
