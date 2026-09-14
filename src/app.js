@@ -1,5 +1,6 @@
 import { GameEngine, CARD_TYPES, PHASES } from './character-engine.js?v=fivechars1';
 import { CHARACTERS, createPlayerDeck, createNpcDeck } from './card-data.js';
+import { cardLore } from './card-lore.js';
 import { CharacterAdapter } from './character-adapter.js?v=fivechars1';
 import { RULES_VERSION } from './rl-adapter.js';
 import { chooseBaselineAction } from './baseline-ai.js';
@@ -32,7 +33,7 @@ function showDetail(card) {
   const root = $('#card-detail');
   root.replaceChildren();
   const img = node('img', 'detail-image'); img.src = card.image; img.alt = card.name;
-  root.append(img, node('small', 'card-type', typeName(card)), node('h3', '', card.name), node('p', '', description(card)));
+  root.append(img, node('small', 'card-type', typeName(card)), node('h3', '', card.name), node('p', '', cardLore(card) ?? description(card)));
 }
 function tributeRequirement(playerIndex, card) {
   if (card?.type !== CARD_TYPES.WITCH) return 0;
