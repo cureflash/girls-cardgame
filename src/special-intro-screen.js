@@ -58,15 +58,18 @@ function installGlobalNegativeLayer() {
   document.body.append(layer);
 
   let startTimer = null;
+  let endTimer = null;
 
   const setNegative = active => {
-    // Flip the complete page instantly. No tween/fade is used.
+    // Flip the complete game view instantly. No fade or tween.
     layer.hidden = !active;
   };
 
   const stop = () => {
     clearTimeout(startTimer);
+    clearTimeout(endTimer);
     startTimer = null;
+    endTimer = null;
     setNegative(false);
   };
 
@@ -77,11 +80,18 @@ function installGlobalNegativeLayer() {
     const start = Math.max(0, Math.min(1, Number(timing.invertPct) / 100));
     const startMs = Math.round(duration * start);
 
-    // Once inversion starts it remains active until the intro overlay is hidden.
+    // Switch to negative instantly, then keep it for the rest of the intro.
     startTimer = setTimeout(() => {
       setNegative(true);
       startTimer = null;
     }, startMs);
+
+    // Safety reset: even if a hidden-attribute mutation is missed by Safari,
+    // force normal colors immediately after the intro duration ends.
+    endTimer = setTimeout(() => {
+      setNegative(false);
+      endTimer = null;
+    }, duration + 32);
   };
 
   const attach = overlay => {
@@ -91,6 +101,10 @@ function installGlobalNegativeLayer() {
     new MutationObserver(sync).observe(overlay, { attributes: true, attributeFilter: ['hidden'] });
     sync();
   };
+
+  // Real summon cutscenes dispatch this event when they finish.
+  window.addEventListener('duel:cutscene-end', stop);
+  window.addEventListener('pagehide', stop);
 
   attach(document.querySelector('#special-summon-intro'));
   new MutationObserver(() => {
