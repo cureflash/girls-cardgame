@@ -17,6 +17,7 @@ export const DOPPEL_VOICE_SOURCES = Object.freeze({
 export const DEFAULT_INTRO_TIMING = Object.freeze({
   durationMs: 3600,
   appearPct: 12,
+  disappearPct: 70,
   titlePct: 34,
   invertPct: 51,
   invertDurationPct: 9,
@@ -27,6 +28,7 @@ export function normalizeIntroTiming(value = {}) {
   return {
     durationMs: Math.min(6000, Math.max(1500, number('durationMs', DEFAULT_INTRO_TIMING.durationMs))),
     appearPct: Math.min(55, Math.max(0, number('appearPct', DEFAULT_INTRO_TIMING.appearPct))),
+    disappearPct: Math.min(100, Math.max(25, number('disappearPct', DEFAULT_INTRO_TIMING.disappearPct))),
     titlePct: Math.min(80, Math.max(5, number('titlePct', DEFAULT_INTRO_TIMING.titlePct))),
     invertPct: Math.min(90, Math.max(10, number('invertPct', DEFAULT_INTRO_TIMING.invertPct))),
     invertDurationPct: Math.min(35, Math.max(3, number('invertDurationPct', DEFAULT_INTRO_TIMING.invertDurationPct))),
@@ -197,6 +199,7 @@ export class SpecialSummonIntro {
         <div class="special-intro-tuner-panel">
           <label>全体 <input data-key="durationMs" type="range" min="1500" max="6000" step="100"><output></output></label>
           <label>本体出現 <input data-key="appearPct" type="range" min="0" max="55" step="1"><output></output></label>
+          <label>本体消去 <input data-key="disappearPct" type="range" min="25" max="100" step="1"><output></output></label>
           <label>文字開始 <input data-key="titlePct" type="range" min="5" max="80" step="1"><output></output></label>
           <label>反転開始 <input data-key="invertPct" type="range" min="10" max="90" step="1"><output></output></label>
           <label>反転時間 <input data-key="invertDurationPct" type="range" min="3" max="35" step="1"><output></output></label>
@@ -285,6 +288,7 @@ export class SpecialSummonIntro {
     this._cancelAnimations();
     const duration = this.timing.durationMs;
     const appear = pct(this.timing.appearPct);
+    const disappear = clamp01(Math.max(appear + .18, pct(this.timing.disappearPct)));
     const title = pct(this.timing.titlePct);
     const invert = pct(this.timing.invertPct);
     const invertEnd = clamp01(invert + pct(this.timing.invertDurationPct));
@@ -304,7 +308,9 @@ export class SpecialSummonIntro {
         { opacity: 0, filter: 'brightness(1.6) blur(2px) drop-shadow(0 0 20px rgba(255,70,180,.8))', offset: appear },
         { opacity: 1, filter: 'brightness(1.3) blur(0) drop-shadow(0 14px 20px rgba(0,0,0,.65))', offset: clamp01(appear + .08) },
         { opacity: 1, filter: 'brightness(1) drop-shadow(0 14px 20px rgba(0,0,0,.7))', offset: clamp01(appear + .16) },
-        { opacity: 1, filter: 'brightness(1) drop-shadow(0 14px 20px rgba(0,0,0,.7))', offset: 1 },
+        { opacity: 1, filter: 'brightness(1) drop-shadow(0 14px 20px rgba(0,0,0,.7))', offset: clamp01(disappear - .04) },
+        { opacity: 0, filter: 'brightness(1) drop-shadow(0 14px 20px rgba(0,0,0,.7))', offset: disappear },
+        { opacity: 0, filter: 'brightness(1) drop-shadow(0 14px 20px rgba(0,0,0,.7))', offset: 1 },
       ], { duration, fill: 'both', easing: 'linear' }),
       pink.animate([
         { opacity: 0, offset: 0 },
