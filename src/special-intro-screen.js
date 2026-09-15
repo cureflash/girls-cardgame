@@ -32,7 +32,7 @@ function hideObsoleteControls() {
   const invertInput = document.querySelector('input[data-key="invertPct"]');
   const invertLabel = invertInput?.closest?.('label');
   if (invertLabel?.firstChild?.nodeType === Node.TEXT_NODE) {
-    invertLabel.firstChild.textContent = '文字完成→反転 ';
+    invertLabel.firstChild.textContent = '名前完成→反転 ';
   }
 }
 
@@ -64,56 +64,46 @@ function installGlobalNegativeLayer() {
   layer.setAttribute('aria-hidden', 'true');
   document.body.append(layer);
 
-  let startTimer = null;
   let endTimer = null;
 
   const setNegative = active => {
-    // Flip the complete game view instantly. No fade or tween.
+    // Instant whole-screen switch. No opacity tween.
     layer.hidden = !active;
   };
 
   const stop = () => {
-    clearTimeout(startTimer);
     clearTimeout(endTimer);
-    startTimer = null;
     endTimer = null;
     setNegative(false);
   };
 
-  const play = () => {
+  const armSafetyReset = () => {
     stop();
     const timing = readTiming();
     const duration = Math.max(1, Number(timing.durationMs) || FALLBACK_TIMING.durationMs);
-    const appear = Math.max(0, Math.min(1, Number(timing.appearPct) / 100));
-    const title = Math.max(0, Math.min(.88, Number(timing.titlePct) / 100));
-    const requestedInvert = Math.max(0, Math.min(1, Number(timing.invertPct) / 100));
-    const titleStart = Math.max(appear + .08, title);
-    // The negative switch happens at the same point that the name animation reaches its final frame.
-    const start = Math.min(1, Math.max(titleStart + .03, requestedInvert));
-    const startMs = Math.round(duration * start);
-
-    // Switch to negative instantly, then keep it for the rest of the intro.
-    startTimer = setTimeout(() => {
-      setNegative(true);
-      startTimer = null;
-    }, startMs);
-
-    // Safety reset: the overlay observer normally clears this exactly when the intro disappears.
+    // Normal path resets when the intro overlay is hidden. This is only a Safari fallback.
     endTimer = setTimeout(() => {
       setNegative(false);
       endTimer = null;
-    }, duration + 32);
+    }, duration + 64);
   };
 
   const attach = overlay => {
     if (!overlay || overlay.dataset.globalNegativeBound === '1') return;
     overlay.dataset.globalNegativeBound = '1';
-    const sync = () => overlay.hidden ? stop() : play();
+    const sync = () => overlay.hidden ? stop() : armSafetyReset();
     new MutationObserver(sync).observe(overlay, { attributes: true, attributeFilter: ['hidden'] });
     sync();
   };
 
-  // Real summon cutscenes dispatch this event when they finish.
+  // The sequence controller emits this only after the witch name animation has
+  // reached its final frame. From here until intro end the negative state stays on.
+  window.addEventListener('duel:special-name-complete', () => {
+    const overlay = document.querySelector('#special-summon-intro');
+    if (!overlay || overlay.hidden) return;
+    setNegative(true);
+  });
+
   window.addEventListener('duel:cutscene-end', stop);
   window.addEventListener('pagehide', stop);
 
