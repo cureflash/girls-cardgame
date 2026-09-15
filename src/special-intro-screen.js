@@ -22,6 +22,13 @@ function readTiming() {
   }
 }
 
+function hideObsoleteInvertDurationControl() {
+  const input = document.querySelector('input[data-key="invertDurationPct"]');
+  const label = input?.closest?.('label');
+  if (label) label.hidden = true;
+  return !!label;
+}
+
 function installGlobalNegativeLayer() {
   if (document.querySelector('#special-intro-global-negative')) return;
 
@@ -51,18 +58,15 @@ function installGlobalNegativeLayer() {
   document.body.append(layer);
 
   let startTimer = null;
-  let endTimer = null;
 
   const setNegative = active => {
-    // hidden is switched directly: no opacity tween, no CSS animation.
+    // Flip the complete page instantly. No tween/fade is used.
     layer.hidden = !active;
   };
 
   const stop = () => {
     clearTimeout(startTimer);
-    clearTimeout(endTimer);
     startTimer = null;
-    endTimer = null;
     setNegative(false);
   };
 
@@ -71,19 +75,13 @@ function installGlobalNegativeLayer() {
     const timing = readTiming();
     const duration = Math.max(1, Number(timing.durationMs) || FALLBACK_TIMING.durationMs);
     const start = Math.max(0, Math.min(1, Number(timing.invertPct) / 100));
-    const end = Math.max(start, Math.min(1, start + Number(timing.invertDurationPct) / 100));
     const startMs = Math.round(duration * start);
-    const endMs = Math.round(duration * end);
 
+    // Once inversion starts it remains active until the intro overlay is hidden.
     startTimer = setTimeout(() => {
       setNegative(true);
       startTimer = null;
     }, startMs);
-
-    endTimer = setTimeout(() => {
-      setNegative(false);
-      endTimer = null;
-    }, endMs);
   };
 
   const attach = overlay => {
@@ -95,8 +93,11 @@ function installGlobalNegativeLayer() {
   };
 
   attach(document.querySelector('#special-summon-intro'));
-  new MutationObserver(() => attach(document.querySelector('#special-summon-intro')))
-    .observe(document.body, { childList: true, subtree: true });
+  new MutationObserver(() => {
+    attach(document.querySelector('#special-summon-intro'));
+    hideObsoleteInvertDurationControl();
+  }).observe(document.body, { childList: true, subtree: true });
+  hideObsoleteInvertDurationControl();
 }
 
 function bootstrap() {
