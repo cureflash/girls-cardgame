@@ -1,11 +1,12 @@
 import { SpecialSummonIntro } from './special-summon-intro.js?v=special-intro5';
 
 const MADOKA_VOICE_CHUNKS = Object.freeze([
-  './assets/audio/doppel/madoka-voice-0.b64?v=madoka-doppel2',
-  './assets/audio/doppel/madoka-voice-1.b64?v=madoka-doppel2',
-  './assets/audio/doppel/madoka-voice-2.b64?v=madoka-doppel2',
-  './assets/audio/doppel/madoka-voice-3.b64?v=madoka-doppel2',
-  './assets/audio/doppel/madoka-voice-4.b64?v=madoka-doppel2',
+  './assets/audio/doppel/madoka-voice-0a.b64?v=madoka-doppel3',
+  './assets/audio/doppel/madoka-voice-0b.b64?v=madoka-doppel3',
+  './assets/audio/doppel/madoka-voice-1.b64?v=madoka-doppel3',
+  './assets/audio/doppel/madoka-voice-2.b64?v=madoka-doppel3',
+  './assets/audio/doppel/madoka-voice-3.b64?v=madoka-doppel3',
+  './assets/audio/doppel/madoka-voice-4.b64?v=madoka-doppel3',
 ]);
 
 let madokaVoiceSourcePromise = null;
