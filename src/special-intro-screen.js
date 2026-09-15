@@ -36,40 +36,54 @@ function installGlobalNegativeLayer() {
   pointer-events:none;
   background:#fff;
   mix-blend-mode:difference;
-  opacity:0;
+  opacity:1;
+  transition:none!important;
+  animation:none!important;
 }
+#special-intro-global-negative[hidden]{display:none!important}
 `;
   document.head.append(style);
 
   const layer = document.createElement('div');
   layer.id = 'special-intro-global-negative';
+  layer.hidden = true;
   layer.setAttribute('aria-hidden', 'true');
   document.body.append(layer);
 
-  let animation = null;
+  let startTimer = null;
+  let endTimer = null;
+
+  const setNegative = active => {
+    // hidden is switched directly: no opacity tween, no CSS animation.
+    layer.hidden = !active;
+  };
+
+  const stop = () => {
+    clearTimeout(startTimer);
+    clearTimeout(endTimer);
+    startTimer = null;
+    endTimer = null;
+    setNegative(false);
+  };
+
   const play = () => {
-    animation?.cancel?.();
+    stop();
     const timing = readTiming();
     const duration = Math.max(1, Number(timing.durationMs) || FALLBACK_TIMING.durationMs);
     const start = Math.max(0, Math.min(1, Number(timing.invertPct) / 100));
     const end = Math.max(start, Math.min(1, start + Number(timing.invertDurationPct) / 100));
-    const before = Math.max(0, start - 0.001);
-    const after = Math.min(1, end + 0.001);
+    const startMs = Math.round(duration * start);
+    const endMs = Math.round(duration * end);
 
-    animation = layer.animate([
-      { opacity: 0, offset: 0 },
-      { opacity: 0, offset: before },
-      { opacity: 1, offset: start },
-      { opacity: 1, offset: end },
-      { opacity: 0, offset: after },
-      { opacity: 0, offset: 1 },
-    ], { duration, fill: 'both', easing: 'steps(1, end)' });
-  };
+    startTimer = setTimeout(() => {
+      setNegative(true);
+      startTimer = null;
+    }, startMs);
 
-  const stop = () => {
-    animation?.cancel?.();
-    animation = null;
-    layer.style.opacity = '0';
+    endTimer = setTimeout(() => {
+      setNegative(false);
+      endTimer = null;
+    }, endMs);
   };
 
   const attach = overlay => {
