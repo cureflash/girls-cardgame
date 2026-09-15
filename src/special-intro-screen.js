@@ -22,11 +22,18 @@ function readTiming() {
   }
 }
 
-function hideObsoleteInvertDurationControl() {
-  const input = document.querySelector('input[data-key="invertDurationPct"]');
-  const label = input?.closest?.('label');
-  if (label) label.hidden = true;
-  return !!label;
+function hideObsoleteControls() {
+  for (const key of ['disappearPct', 'invertDurationPct']) {
+    const input = document.querySelector(`input[data-key="${key}"]`);
+    const label = input?.closest?.('label');
+    if (label) label.hidden = true;
+  }
+
+  const invertInput = document.querySelector('input[data-key="invertPct"]');
+  const invertLabel = invertInput?.closest?.('label');
+  if (invertLabel?.firstChild?.nodeType === Node.TEXT_NODE) {
+    invertLabel.firstChild.textContent = '文字完成→反転 ';
+  }
 }
 
 function installGlobalNegativeLayer() {
@@ -77,7 +84,12 @@ function installGlobalNegativeLayer() {
     stop();
     const timing = readTiming();
     const duration = Math.max(1, Number(timing.durationMs) || FALLBACK_TIMING.durationMs);
-    const start = Math.max(0, Math.min(1, Number(timing.invertPct) / 100));
+    const appear = Math.max(0, Math.min(1, Number(timing.appearPct) / 100));
+    const title = Math.max(0, Math.min(.88, Number(timing.titlePct) / 100));
+    const requestedInvert = Math.max(0, Math.min(1, Number(timing.invertPct) / 100));
+    const titleStart = Math.max(appear + .08, title);
+    // The negative switch happens at the same point that the name animation reaches its final frame.
+    const start = Math.min(1, Math.max(titleStart + .03, requestedInvert));
     const startMs = Math.round(duration * start);
 
     // Switch to negative instantly, then keep it for the rest of the intro.
@@ -86,8 +98,7 @@ function installGlobalNegativeLayer() {
       startTimer = null;
     }, startMs);
 
-    // Safety reset: even if a hidden-attribute mutation is missed by Safari,
-    // force normal colors immediately after the intro duration ends.
+    // Safety reset: the overlay observer normally clears this exactly when the intro disappears.
     endTimer = setTimeout(() => {
       setNegative(false);
       endTimer = null;
@@ -109,9 +120,9 @@ function installGlobalNegativeLayer() {
   attach(document.querySelector('#special-summon-intro'));
   new MutationObserver(() => {
     attach(document.querySelector('#special-summon-intro'));
-    hideObsoleteInvertDurationControl();
+    hideObsoleteControls();
   }).observe(document.body, { childList: true, subtree: true });
-  hideObsoleteInvertDurationControl();
+  hideObsoleteControls();
 }
 
 function bootstrap() {
