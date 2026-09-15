@@ -16,6 +16,38 @@
     }
   }
   </script>
+  <style>
+    /* Keep the Walpurgis timing editor fully inside the viewport on iPad/mobile Safari. */
+    .special-intro-tuner-panel {
+      position: fixed !important;
+      left: 50% !important;
+      right: auto !important;
+      top: clamp(100px, 20vh, 180px) !important;
+      transform: translateX(-50%) !important;
+      width: min(420px, calc(100vw - 24px)) !important;
+      max-height: calc(100dvh - 220px);
+      overflow-y: auto;
+      box-sizing: border-box;
+    }
+    .special-intro-tuner-panel label {
+      grid-template-columns: 76px minmax(110px, 1fr) 48px !important;
+    }
+    @media (max-width: 520px) {
+      .special-intro-tuner-panel {
+        top: 90px !important;
+        width: calc(100vw - 16px) !important;
+        max-height: calc(100dvh - 110px);
+        padding: 10px !important;
+      }
+      .special-intro-tuner-panel label {
+        grid-template-columns: 68px minmax(90px, 1fr) 44px !important;
+        gap: 6px !important;
+      }
+      .special-intro-tuner-actions {
+        flex-wrap: wrap;
+      }
+    }
+  </style>
 </head>
 <body>
   <header class="header">
@@ -78,7 +110,7 @@
   <script type="module" src="./src/app.js?v=homura6"></script>
   <script type="module" src="./src/opening-voice.js?v=opening1"></script>
   <script type="module" src="./src/battle-bgm.js?v=bgm5"></script>
-  <script type="module" src="./src/special-summon-intro.js?v=special-intro3"></script>
+  <script type="module" src="./src/special-summon-intro.js?v=special-intro4"></script>
   <script type="module" src="./src/battle-sfx.js?v=sfx4"></script>
 </body>
 </html>
