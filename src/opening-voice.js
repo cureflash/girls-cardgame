@@ -54,17 +54,29 @@ export class OpeningVoice {
 }
 
 function bootstrap() {
-  if (typeof document === 'undefined' || typeof Audio === 'undefined') return;
+  if (typeof window === 'undefined' || typeof document === 'undefined' || typeof Audio === 'undefined') return;
 
   const openingVoice = new OpeningVoice();
+  let startTimer = null;
 
-  document.addEventListener('pointerdown', event => {
-    const card = event.target.closest?.('#bottom-player .hand button.card');
-    const player = document.querySelector('#bottom-player');
-    if (!card || !player?.classList.contains('active')) return;
-    if (document.querySelector('#turn-name')?.textContent === 'デュエル終了') return;
-    openingVoice.play(player.dataset.character);
-  }, { capture: true, passive: true });
+  const cancelPending = () => {
+    if (startTimer !== null) clearTimeout(startTimer);
+    startTimer = null;
+  };
+
+  const scheduleAfterBgm = () => {
+    cancelPending();
+    startTimer = setTimeout(() => {
+      startTimer = null;
+      if (document.querySelector('#turn-name')?.textContent === 'デュエル終了') return;
+      const player = document.querySelector('#bottom-player');
+      openingVoice.play(player?.dataset?.character);
+    }, 1000);
+  };
+
+  // Start voice one second after the normal battle BGM has actually begun playing.
+  // This replaces the old behavior that triggered on the first hand-card pointerdown.
+  window.addEventListener('duel:normal-bgm-started', scheduleAfterBgm);
 
   document.addEventListener('click', event => {
     const button = event.target.closest?.('button');
@@ -73,6 +85,7 @@ function bootstrap() {
     if (button.id === 'confirm-restart'
       || (button.id === 'new-game' && gameOver)
       || (button.closest('#actions') && button.textContent === 'もう一度対戦')) {
+      cancelPending();
       openingVoice.reset();
     }
   }, true);
