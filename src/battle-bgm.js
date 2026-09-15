@@ -96,6 +96,12 @@ function bootstrap() {
     specialSrc: './assets/audio/Battle_special.mp4?v=bgm5',
   });
 
+  // "playing" fires only when the normal BGM has actually started/resumed.
+  // Opening voice uses this as its zero point and plays one second later.
+  bgm.normal.addEventListener?.('playing', () => {
+    window.dispatchEvent(new CustomEvent('duel:normal-bgm-started'));
+  });
+
   bgm.startGame();
   window.addEventListener('duel:event', event => bgm.handleEvent(event.detail));
   window.addEventListener('duel:special-bgm', () => bgm.startSpecial());
