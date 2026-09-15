@@ -3,8 +3,16 @@ const SALVATION_CODE = 'witch-salvation_13';
 const STORAGE_KEY = 'specialIntroAssetLayoutV1';
 
 const WALPURGIS_IMAGE_SRC = './assets/special-intro/walpurgis.webp?v=special-intro3';
-// Use the full-resolution Salvation Witch art rather than the reduced card WebP.
-const SALVATION_IMAGE_SRC = './assets/cards/madoka/witch_salvation_13.png?v=salvation-art2';
+const SALVATION_CHUNK_URLS = Object.freeze([
+  './assets/special-intro/salvation-art-0.b64?v=salvation-art3',
+  './assets/special-intro/salvation-art-0b.b64?v=salvation-art3',
+  './assets/special-intro/salvation-art-1.b64?v=salvation-art3',
+  './assets/special-intro/salvation-art-2.b64?v=salvation-art3',
+  './assets/special-intro/salvation-art-3.b64?v=salvation-art3',
+  './assets/special-intro/salvation-art-4.b64?v=salvation-art3',
+  './assets/special-intro/salvation-art-5a.b64?v=salvation-art3',
+  './assets/special-intro/salvation-art-5b.b64?v=salvation-art3',
+]);
 
 const DEFAULTS = Object.freeze({
   walpurgis: Object.freeze({ x: 27, y: 50, scale: 78 }),
@@ -13,6 +21,8 @@ const DEFAULTS = Object.freeze({
 
 let layouts = loadLayouts();
 let activeKind = 'walpurgis';
+let salvationImageSrc = null;
+let salvationImagePromise = null;
 
 function normalizedLayout(value, fallback) {
   const number = (key, min, max) => {
@@ -54,8 +64,26 @@ function currentKind() {
   return overlay()?.dataset?.witch === 'salvation' ? 'salvation' : activeKind;
 }
 
-function imageFor(kind) {
-  return kind === 'salvation' ? SALVATION_IMAGE_SRC : WALPURGIS_IMAGE_SRC;
+function ensureSalvationImage() {
+  if (salvationImageSrc) return Promise.resolve(salvationImageSrc);
+  if (salvationImagePromise) return salvationImagePromise;
+
+  salvationImagePromise = Promise.all(
+    SALVATION_CHUNK_URLS.map(async url => {
+      const response = await fetch(url, { cache: 'force-cache' });
+      if (!response.ok) throw new Error(`Failed to load ${url}: ${response.status}`);
+      return (await response.text()).trim();
+    }),
+  ).then(parts => {
+    salvationImageSrc = `data:image/webp;base64,${parts.join('')}`;
+    return salvationImageSrc;
+  }).catch(error => {
+    console.warn('Failed to load Salvation Witch intro art', error);
+    salvationImagePromise = null;
+    return null;
+  });
+
+  return salvationImagePromise;
 }
 
 function applyLayout(kind = currentKind()) {
@@ -65,18 +93,45 @@ function applyLayout(kind = currentKind()) {
 
   activeKind = kind === 'salvation' ? 'salvation' : 'walpurgis';
   const cfg = layouts[activeKind];
-  enemy.src = imageFor(activeKind);
+
   enemy.style.left = `${cfg.x}%`;
   enemy.style.top = `${cfg.y}%`;
   enemy.style.transform = `translate(-50%,-50%) scale(${cfg.scale / 100}) rotate(-2deg)`;
+
+  if (activeKind === 'salvation') {
+    if (salvationImageSrc) {
+      enemy.src = salvationImageSrc;
+      enemy.style.visibility = '';
+    } else {
+      // Never expose the deck/card image while the clean summon art is loading.
+      enemy.style.visibility = 'hidden';
+      ensureSalvationImage().then(src => {
+        if (!src || currentKind() !== 'salvation') return;
+        enemy.src = src;
+        enemy.style.visibility = '';
+      });
+    }
+  } else {
+    enemy.src = WALPURGIS_IMAGE_SRC;
+    enemy.style.visibility = '';
+  }
+
   syncControls();
   return true;
 }
 
 function setKindFromCode(code) {
-  if (code === SALVATION_CODE) activeKind = 'salvation';
-  else if (code === WALPURGIS_CODE) activeKind = 'walpurgis';
-  setTimeout(() => applyLayout(activeKind), 0);
+  if (code === SALVATION_CODE) {
+    activeKind = 'salvation';
+    const enemy = overlay()?.querySelector('.special-intro-enemy');
+    if (enemy && !salvationImageSrc) enemy.style.visibility = 'hidden';
+    ensureSalvationImage().finally(() => setTimeout(() => applyLayout('salvation'), 0));
+    return;
+  }
+  if (code === WALPURGIS_CODE) {
+    activeKind = 'walpurgis';
+    setTimeout(() => applyLayout('walpurgis'), 0);
+  }
 }
 
 let controls = null;
@@ -91,7 +146,7 @@ function syncControls() {
     const key = input.dataset.layoutKey;
     input.value = String(cfg[key]);
     const out = input.parentElement.querySelector('output');
-    if (out) out.value = key === 'scale' ? `${Math.round(cfg[key])}%` : `${Math.round(cfg[key])}%`;
+    if (out) out.value = `${Math.round(cfg[key])}%`;
   }
 }
 
@@ -147,8 +202,13 @@ function bindOverlay() {
   const observer = new MutationObserver(records => {
     if (records.some(record => record.attributeName === 'data-witch')) {
       activeKind = root.dataset.witch === 'salvation' ? 'salvation' : 'walpurgis';
-      // salvation-intro.js updates src in the same task; apply after it finishes.
-      setTimeout(() => applyLayout(activeKind), 0);
+      if (activeKind === 'salvation') {
+        const enemy = root.querySelector('.special-intro-enemy');
+        if (enemy && !salvationImageSrc) enemy.style.visibility = 'hidden';
+        ensureSalvationImage().finally(() => setTimeout(() => applyLayout('salvation'), 0));
+      } else {
+        setTimeout(() => applyLayout('walpurgis'), 0);
+      }
     }
   });
   observer.observe(root, { attributes: true, attributeFilter: ['data-witch'] });
@@ -157,6 +217,9 @@ function bindOverlay() {
 }
 
 function bootstrap() {
+  // Preload the clean Salvation Witch art so preview/summon can switch without showing card art.
+  ensureSalvationImage();
+
   const tryInstall = () => {
     installControls();
     bindOverlay();
@@ -169,7 +232,9 @@ function bootstrap() {
       setTimeout(() => applyLayout('walpurgis'), 0);
     } else if (event.target.closest?.('#salvation-intro-preview')) {
       activeKind = 'salvation';
-      setTimeout(() => applyLayout('salvation'), 0);
+      const enemy = overlay()?.querySelector('.special-intro-enemy');
+      if (enemy && !salvationImageSrc) enemy.style.visibility = 'hidden';
+      ensureSalvationImage().finally(() => setTimeout(() => applyLayout('salvation'), 0));
     }
   }, true);
 
