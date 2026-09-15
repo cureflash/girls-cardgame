@@ -34,8 +34,25 @@ function hideObsoleteControls() {
   const invertInput = document.querySelector('input[data-key="invertPct"]');
   const invertLabel = invertInput?.closest?.('label');
   if (invertLabel?.firstChild?.nodeType === Node.TEXT_NODE) {
-    invertLabel.firstChild.textContent = '文字完成→反転 ';
+    invertLabel.firstChild.textContent = '名前完成→反転 ';
   }
+}
+
+function installHoldStyle() {
+  if (document.querySelector('#special-intro-sequence-style')) return;
+  const style = document.createElement('style');
+  style.id = 'special-intro-sequence-style';
+  style.textContent = `
+#special-summon-intro.special-intro-name-held .special-intro-enemy,
+#special-summon-intro.special-intro-name-held .special-intro-title,
+#special-summon-intro.special-intro-name-held .special-intro-brush{
+  opacity:1!important;
+}
+#special-summon-intro.special-intro-name-held .special-intro-brush{
+  transform:translateX(0) scaleX(1)!important;
+}
+`;
+  document.head.append(style);
 }
 
 function installSequenceController() {
@@ -44,8 +61,12 @@ function installSequenceController() {
   overlay.dataset.sequenceControllerBound = '1';
 
   let animations = [];
+  let nameCompleteTimer = null;
 
   const stop = () => {
+    clearTimeout(nameCompleteTimer);
+    nameCompleteTimer = null;
+    overlay.classList.remove('special-intro-name-held');
     for (const animation of animations) animation?.cancel?.();
     animations = [];
   };
@@ -60,10 +81,10 @@ function installSequenceController() {
     const rawTitle = clamp01(Number(timing.titlePct) / 100);
     const rawInvert = clamp01(Number(timing.invertPct) / 100);
 
-    // Sequence is always: witch -> name animation -> instant negative.
-    // Keep at least a short interval for the name animation even if the sliders cross.
+    // Fixed order for both Walpurgisnacht and the Salvation Witch:
+    // witch appears -> name animates fully -> negative switches instantly.
     const titleStart = Math.max(appear + 0.08, Math.min(rawTitle, 0.88));
-    const invertStart = Math.max(titleStart + 0.03, rawInvert);
+    const nameComplete = Math.min(1, Math.max(titleStart + 0.03, rawInvert));
     const titleLead = Math.max(0, titleStart - 0.015);
     const enemyVisible = Math.min(titleStart, appear + 0.08);
 
@@ -72,8 +93,8 @@ function installSequenceController() {
     const brush = overlay.querySelector('.special-intro-brush');
     const white = overlay.querySelector('.special-intro-white');
 
-    // Cancel the original fade-out timelines. The witch and name must remain visible
-    // through the inverted section, then the whole overlay is removed by _finish().
+    // Remove the original fade-out timelines. These elements must remain visible
+    // after name completion, through the negative phase, until the overlay itself ends.
     cancelAnimations(enemy);
     cancelAnimations(titleLayer);
     cancelAnimations(brush);
@@ -94,7 +115,7 @@ function installSequenceController() {
         { opacity: 0, offset: 0 },
         { opacity: 0, offset: titleLead },
         { opacity: 1, offset: titleStart },
-        { opacity: 1, offset: invertStart },
+        { opacity: 1, offset: nameComplete },
         { opacity: 1, offset: 1 },
       ], { duration, fill: 'both', easing: 'linear' }));
     }
@@ -104,13 +125,12 @@ function installSequenceController() {
         { transform: 'translateX(16vw) scaleX(.25)', opacity: 0, offset: 0 },
         { transform: 'translateX(16vw) scaleX(.25)', opacity: 0, offset: titleLead },
         { transform: 'translateX(12vw) scaleX(.35)', opacity: .2, offset: titleStart },
-        { transform: 'translateX(0) scaleX(1)', opacity: 1, offset: invertStart },
+        { transform: 'translateX(0) scaleX(1)', opacity: 1, offset: nameComplete },
         { transform: 'translateX(0) scaleX(1)', opacity: 1, offset: 1 },
       ], { duration, fill: 'both', easing: 'ease-out' }));
     }
 
-    // Keep only the appearance flash. Do not place another white flash between
-    // the completed name animation and the negative switch.
+    // Keep only the initial appearance flash.
     if (white) {
       animations.push(white.animate([
         { opacity: 0, offset: 0 },
@@ -120,6 +140,18 @@ function installSequenceController() {
         { opacity: 0, offset: 1 },
       ], { duration, fill: 'both', easing: 'linear' }));
     }
+
+    // This is the single source of truth for the negative switch. At this exact
+    // moment the name is forced into its completed state and held there.
+    const completeMs = Math.round(duration * nameComplete);
+    nameCompleteTimer = setTimeout(() => {
+      if (overlay.hidden) return;
+      overlay.classList.add('special-intro-name-held');
+      window.dispatchEvent(new CustomEvent('duel:special-name-complete', {
+        detail: { nameComplete, durationMs: duration },
+      }));
+      nameCompleteTimer = null;
+    }, completeMs);
   };
 
   const sync = () => {
@@ -134,6 +166,7 @@ function installSequenceController() {
 
 function bootstrap() {
   const install = () => {
+    installHoldStyle();
     hideObsoleteControls();
     installSequenceController();
   };
