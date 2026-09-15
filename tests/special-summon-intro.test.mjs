@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DOPPEL_VOICE_SOURCES, doppelVoiceSource, isSpecialWitchSummon } from '../src/special-summon-intro.js';
+import {
+  DEFAULT_INTRO_TIMING,
+  DOPPEL_VOICE_SOURCES,
+  doppelVoiceSource,
+  isSpecialWitchSummon,
+  normalizeIntroTiming,
+} from '../src/special-summon-intro.js';
 
 const event = (type, code, id = 'player-madoka-1') => ({ type, card: { code, id } });
 
@@ -21,4 +27,14 @@ test('Doppel voices currently exist for Madoka and Mami only', () => {
     assert.equal(DOPPEL_VOICE_SOURCES[id], null);
     assert.equal(doppelVoiceSource(id), null);
   }
+});
+
+test('intro timing sliders are clamped to supported ranges', () => {
+  assert.deepEqual(normalizeIntroTiming({}), DEFAULT_INTRO_TIMING);
+  assert.equal(normalizeIntroTiming({ durationMs: 999 }).durationMs, 1500);
+  assert.equal(normalizeIntroTiming({ durationMs: 9999 }).durationMs, 6000);
+  assert.equal(normalizeIntroTiming({ appearPct: -10 }).appearPct, 0);
+  assert.equal(normalizeIntroTiming({ titlePct: 99 }).titlePct, 80);
+  assert.equal(normalizeIntroTiming({ invertPct: 99 }).invertPct, 90);
+  assert.equal(normalizeIntroTiming({ invertDurationPct: 1 }).invertDurationPct, 3);
 });
