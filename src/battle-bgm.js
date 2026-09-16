@@ -82,7 +82,7 @@ export class BattleBgm {
   }
 
   unlock() {
-    if (!this.current?.paused || !this.blocked) return;
+    if (!this.current?.paused) return;
     if (this.current.ended) this.current.currentTime = 0;
     this._play(this.current);
   }
@@ -118,8 +118,7 @@ function bootstrap() {
   window.addEventListener('duel:special-bgm', () => bgm.startSpecial());
 
   // On a restarted duel the previous gameOver event has already cleared `current`.
-  // Starting on pointerdown keeps the new play() call inside the first user-activation
-  // event instead of waiting until click, where Safari can intermittently reject it.
+  // Start on pointerdown so the new play() call is made in the first user activation.
   document.addEventListener('pointerdown', event => {
     if (restartButton(event.target)) bgm.startGame();
     else bgm.unlock();
@@ -130,12 +129,12 @@ function bootstrap() {
     else bgm.unlock();
   });
 
-  // click is a fallback for keyboard/synthetic activation and a same-gesture retry
-  // only when the pointerdown/keydown play attempt was actually blocked.
+  // click is a fallback for synthetic activation and a same-gesture retry only when
+  // the pointerdown/keydown start attempt was actually rejected.
   document.addEventListener('click', event => {
     if (!restartButton(event.target)) return;
     if (bgm.current !== bgm.normal) bgm.startGame();
-    else bgm.unlock();
+    else if (bgm.blocked) bgm.unlock();
   }, true);
 }
 
