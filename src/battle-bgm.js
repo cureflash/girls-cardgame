@@ -113,27 +113,33 @@ function bootstrap() {
       : null;
   };
 
+  const restartGameAudio = () => {
+    // Reset dependent opening audio before normal BGM can emit "playing".
+    window.dispatchEvent(new CustomEvent('duel:audio-restart'));
+    bgm.startGame();
+  };
+
   bgm.startGame();
   window.addEventListener('duel:event', event => bgm.handleEvent(event.detail));
   window.addEventListener('duel:special-bgm', () => bgm.startSpecial());
 
-  // On a restarted duel the previous gameOver event has already cleared `current`.
-  // Start on pointerdown so the new play() call is made in the first user activation.
+  // At game over `current` is null. Restart from pointerdown so play() runs in
+  // the first user-activation event instead of waiting for the later click event.
   document.addEventListener('pointerdown', event => {
-    if (restartButton(event.target)) bgm.startGame();
+    if (restartButton(event.target)) restartGameAudio();
     else bgm.unlock();
   }, { passive: true });
 
   document.addEventListener('keydown', event => {
-    if ((event.key === 'Enter' || event.key === ' ') && restartButton(event.target)) bgm.startGame();
+    if ((event.key === 'Enter' || event.key === ' ') && restartButton(event.target)) restartGameAudio();
     else bgm.unlock();
   });
 
-  // click is a fallback for synthetic activation and a same-gesture retry only when
-  // the pointerdown/keydown start attempt was actually rejected.
+  // Synthetic clicks may have no pointerdown. If pointerdown already started the
+  // BGM, retry here only when that play attempt was rejected.
   document.addEventListener('click', event => {
     if (!restartButton(event.target)) return;
-    if (bgm.current !== bgm.normal) bgm.startGame();
+    if (bgm.current !== bgm.normal) restartGameAudio();
     else if (bgm.blocked) bgm.unlock();
   }, true);
 }
