@@ -1,4 +1,4 @@
-import { SpecialSummonIntro } from './special-summon-intro.js?v=special-intro5';
+import { SpecialSummonIntro } from './special-summon-intro.js?v=special-intro6';
 
 const MADOKA_VOICE_CHUNKS = Object.freeze([
   './assets/audio/doppel/madoka-voice-0a.b64?v=madoka-doppel4',
