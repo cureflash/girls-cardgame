@@ -19,6 +19,24 @@ class FakeAudio {
   dispatch(type) { this.listeners.get(type)?.(); }
 }
 
+class RejectOnceAudio extends FakeAudio {
+  constructor(src) {
+    super(src);
+    this.rejectNext = true;
+  }
+  play() {
+    this.playCount++;
+    this.ended = false;
+    if (this.rejectNext) {
+      this.rejectNext = false;
+      this.paused = true;
+      return Promise.reject(new Error('autoplay blocked'));
+    }
+    this.paused = false;
+    return Promise.resolve();
+  }
+}
+
 const special = (code, type = 'summon') => ({ type, card: { code } });
 
 test('special BGM target is Walpurgis or Salvation Witch on summon or revive', () => {
@@ -105,4 +123,19 @@ test('starting a new game stops special and returns to normal from the beginning
   assert.equal(bgm.special.currentTime, 0);
   assert.equal(bgm.special.paused, true);
   assert.equal(bgm.normal.playCount, 2);
+});
+
+test('a rejected normal BGM start can be retried by the same restart interaction', async () => {
+  const bgm = new BattleBgm({ normalSrc: 'normal', specialSrc: 'special', AudioCtor: RejectOnceAudio });
+  bgm.startGame();
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(bgm.current, bgm.normal);
+  assert.equal(bgm.normal.paused, true);
+  assert.equal(bgm.blocked, true);
+
+  bgm.unlock();
+  assert.equal(bgm.normal.playCount, 2);
+  assert.equal(bgm.normal.paused, false);
+  assert.equal(bgm.blocked, false);
 });
