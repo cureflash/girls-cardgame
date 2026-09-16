@@ -4,45 +4,18 @@ const TIMING_STORAGE_KEY = 'walpurgisIntroTimingV1';
 
 const WALPURGIS_IMAGE_SRC = './assets/special-intro/walpurgis.webp?v=special-intro3';
 const WALPURGIS_RUNES_SRC = './assets/special-intro/walpurgis-runes.png?v=special-intro3';
-
-export const DOPPEL_VOICE_SOURCES = Object.freeze({
-  madoka: './assets/audio/doppel/madoka.mp3?v=doppel3',
-  mami: './assets/audio/doppel/mami.mp3?v=doppel3',
-  sayaka: null,
-  kyoko: null,
-  homura: null,
-  nagisa: null,
-});
-
-export const DEFAULT_INTRO_TIMING = Object.freeze({
-  durationMs: 3600,
-  appearPct: 12,
-  disappearPct: 70,
-  titlePct: 34,
-  invertPct: 51,
-  invertDurationPct: 9,
-});
-
-export function normalizeIntroTiming(value = {}) {
-  const number = (key, fallback) => Number.isFinite(Number(value[key])) ? Number(value[key]) : fallback;
-  return {
-    durationMs: Math.min(6000, Math.max(1500, number('durationMs', DEFAULT_INTRO_TIMING.durationMs))),
-    appearPct: Math.min(55, Math.max(0, number('appearPct', DEFAULT_INTRO_TIMING.appearPct))),
-    disappearPct: Math.min(100, Math.max(25, number('disappearPct', DEFAULT_INTRO_TIMING.disappearPct))),
-    titlePct: Math.min(80, Math.max(5, number('titlePct', DEFAULT_INTRO_TIMING.titlePct))),
-    invertPct: Math.min(90, Math.max(10, number('invertPct', DEFAULT_INTRO_TIMING.invertPct))),
-    invertDurationPct: Math.min(35, Math.max(3, number('invertDurationPct', DEFAULT_INTRO_TIMING.invertDurationPct))),
-  };
-}
-
-export function isSpecialWitchSummon(event) {
-  return ['summon', 'revive'].includes(event?.type)
-    && SPECIAL_WITCH_CODES.has(event.card?.code);
-}
-
-export function doppelVoiceSource(characterId) {
-  return DOPPEL_VOICE_SOURCES[characterId] ?? null;
-}
+const MADOKA_VOICE_CHUNKS = Object.freeze([
+  './assets/audio/doppel/madoka-voice-0a.b64?v=madoka-doppel5',
+  './assets/audio/doppel/madoka-voice-0b.b64?v=madoka-doppel5',
+  './assets/audio/doppel/madoka-voice-1.b64?v=madoka-doppel5',
+  './assets/audio/doppel/madoka-voice-2.b64?v=madoka-doppel5',
+  './assets/audio/doppel/madoka-voice-3.b64?v=madoka-doppel5',
+  './assets/audio/doppel/madoka-voice-4.b64?v=madoka-doppel5',
+]);
+const MADOKA_EXPECTED_BASE64_LENGTH = 22788;
+const MADOKA_EXPECTED_BYTE_LENGTH = 17090;
+const VOICE_PREP_TIMEOUT_MS = 5000;
+const VOICE_PLAYBACK_TIMEOUT_MS = 30000;
 
 const NATIVE_SET_TIMEOUT = globalThis.setTimeout?.bind(globalThis);
 const NATIVE_CLEAR_TIMEOUT = globalThis.clearTimeout?.bind(globalThis);
@@ -79,6 +52,44 @@ export function installCutsceneTimerGate(windowRef = globalThis.window) {
   };
 }
 
+export const DOPPEL_VOICE_SOURCES = Object.freeze({
+  madoka: 'verified-chunks',
+  mami: './assets/audio/doppel/mami.mp3?v=doppel3',
+  sayaka: null,
+  kyoko: null,
+  homura: null,
+  nagisa: null,
+});
+
+export const DEFAULT_INTRO_TIMING = Object.freeze({
+  durationMs: 3600,
+  appearPct: 12,
+  titlePct: 34,
+  invertPct: 51,
+});
+
+let madokaVoiceSourcePromise = null;
+let madokaVoiceObjectUrl = null;
+
+export function normalizeIntroTiming(value = {}) {
+  const number = (key, fallback) => Number.isFinite(Number(value[key])) ? Number(value[key]) : fallback;
+  return {
+    durationMs: Math.min(6000, Math.max(1500, number('durationMs', DEFAULT_INTRO_TIMING.durationMs))),
+    appearPct: Math.min(55, Math.max(0, number('appearPct', DEFAULT_INTRO_TIMING.appearPct))),
+    titlePct: Math.min(80, Math.max(5, number('titlePct', DEFAULT_INTRO_TIMING.titlePct))),
+    invertPct: Math.min(90, Math.max(10, number('invertPct', DEFAULT_INTRO_TIMING.invertPct))),
+  };
+}
+
+export function isSpecialWitchSummon(event) {
+  return ['summon', 'revive'].includes(event?.type)
+    && SPECIAL_WITCH_CODES.has(event.card?.code);
+}
+
+export function doppelVoiceSource(characterId) {
+  return DOPPEL_VOICE_SOURCES[characterId] ?? null;
+}
+
 function clamp01(value) {
   return Math.max(0, Math.min(1, value));
 }
@@ -107,6 +118,41 @@ function animateKeyframes(element, keyframes, options) {
   return element.animate(monotonicKeyframes(keyframes), options);
 }
 
+function decodeMadokaVoice(base64) {
+  if (base64.length !== MADOKA_EXPECTED_BASE64_LENGTH) {
+    throw new Error(`Madoka voice base64 length mismatch: ${base64.length}`);
+  }
+  const binary = atob(base64);
+  if (binary.length !== MADOKA_EXPECTED_BYTE_LENGTH) {
+    throw new Error(`Madoka voice byte length mismatch: ${binary.length}`);
+  }
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  const blob = new Blob([bytes], { type: 'audio/mpeg' });
+  madokaVoiceObjectUrl = URL.createObjectURL(blob);
+  return madokaVoiceObjectUrl;
+}
+
+function loadMadokaVoiceSource() {
+  if (madokaVoiceSourcePromise) return madokaVoiceSourcePromise;
+  madokaVoiceSourcePromise = Promise.all(
+    MADOKA_VOICE_CHUNKS.map(async url => {
+      const response = await fetch(url, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`Failed to load ${url}: ${response.status}`);
+      return (await response.text()).trim();
+    }),
+  ).then(parts => decodeMadokaVoice(parts.join('')))
+    .catch(error => {
+      madokaVoiceSourcePromise = null;
+      throw error;
+    });
+  return madokaVoiceSourcePromise;
+}
+
+function timeoutResult(ms, value = null) {
+  return new Promise(resolve => NATIVE_SET_TIMEOUT(resolve, ms, value));
+}
+
 export class SpecialSummonIntro {
   constructor({
     documentRef = globalThis.document,
@@ -123,21 +169,22 @@ export class SpecialSummonIntro {
     this.previewing = false;
     this.sceneTimer = null;
     this.voiceTimer = null;
+    this.nameCompleteTimer = null;
     this.currentVoice = null;
     this.animations = [];
-    this.voices = Object.fromEntries(
-      Object.entries(DOPPEL_VOICE_SOURCES)
-        .filter(([, src]) => !!src)
-        .map(([characterId, src]) => {
-          const audio = new AudioCtor(src);
-          audio.loop = false;
-          audio.preload = 'auto';
-          audio.volume = 1;
-          return [characterId, audio];
-        }),
-    );
+    this.voices = {
+      madoka: new AudioCtor(),
+      mami: new AudioCtor(DOPPEL_VOICE_SOURCES.mami),
+    };
+    for (const audio of Object.values(this.voices)) {
+      audio.loop = false;
+      audio.preload = 'auto';
+      audio.volume = 1;
+    }
     this.overlay = this._createOverlay();
+    this.negativeLayer = this._createNegativeLayer();
     this._installControls();
+    loadMadokaVoiceSource().catch(() => {});
   }
 
   _loadTiming() {
@@ -153,7 +200,7 @@ export class SpecialSummonIntro {
     try {
       this.storage?.setItem?.(TIMING_STORAGE_KEY, JSON.stringify(this.timing));
     } catch {
-      // localStorage can be unavailable in private/file contexts. Timing still works for this session.
+      // Timing remains valid for this session when storage is unavailable.
     }
   }
 
@@ -162,16 +209,16 @@ export class SpecialSummonIntro {
     if (existing) return existing;
     if (!this.document?.body) return null;
 
-    const style = this.document.createElement('style');
-    style.id = 'special-summon-intro-style';
-    style.textContent = `
+    if (!this.document.querySelector('#special-summon-intro-style')) {
+      const style = this.document.createElement('style');
+      style.id = 'special-summon-intro-style';
+      style.textContent = `
 #special-summon-intro[hidden]{display:none!important}
 #special-summon-intro{position:fixed;inset:0;z-index:10000;overflow:hidden;background:transparent;pointer-events:auto}
 .special-intro-enemy{position:absolute;z-index:2;left:27%;top:50%;width:min(40vw,520px);max-height:82vh;object-fit:contain;transform:translate(-50%,-50%) scale(.78) rotate(-2deg);opacity:0;filter:drop-shadow(0 18px 28px rgba(0,0,0,.82));display:block}
-.special-intro-pink,.special-intro-white,.special-intro-negative,.special-intro-title{position:absolute;inset:0;pointer-events:none}
+.special-intro-pink,.special-intro-white,.special-intro-title{position:absolute;inset:0;pointer-events:none}
 .special-intro-pink{z-index:1;background:radial-gradient(circle at 35% 45%,rgba(255,255,255,.96),rgba(255,90,180,.72) 18%,rgba(185,40,210,.34) 38%,transparent 62%);opacity:0;mix-blend-mode:screen}
 .special-intro-white{z-index:4;background:#fff;opacity:0;mix-blend-mode:screen}
-.special-intro-negative{z-index:5;background:#fff;opacity:0;mix-blend-mode:difference}
 .special-intro-title{z-index:3;display:flex;align-items:center;justify-content:flex-end;padding-right:6vw;box-sizing:border-box;opacity:0}
 .special-intro-brush{position:relative;width:min(62vw,920px);height:210px;display:flex;align-items:center;justify-content:center;transform:translateX(16vw)}
 .special-intro-brush::before{content:"";position:absolute;inset:0;background:#080607;clip-path:polygon(2% 18%,8% 10%,15% 18%,24% 5%,31% 14%,40% 6%,48% 15%,56% 2%,64% 14%,73% 8%,83% 17%,96% 11%,92% 32%,99% 41%,93% 50%,98% 62%,89% 68%,96% 85%,82% 82%,73% 92%,62% 83%,51% 96%,40% 85%,30% 94%,21% 82%,10% 90%,15% 70%,4% 63%,11% 51%,3% 41%,10% 31%);filter:drop-shadow(0 0 7px rgba(0,0,0,.9))}
@@ -186,6 +233,8 @@ export class SpecialSummonIntro {
 .special-intro-tuner-panel output{text-align:right;font-variant-numeric:tabular-nums}
 .special-intro-tuner-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:2px}
 `;
+      this.document.head.append(style);
+    }
 
     const overlay = this.document.createElement('div');
     overlay.id = 'special-summon-intro';
@@ -195,11 +244,32 @@ export class SpecialSummonIntro {
       <div class="special-intro-pink"></div>
       <img class="special-intro-enemy" src="${WALPURGIS_IMAGE_SRC}" alt="">
       <div class="special-intro-title"><div class="special-intro-brush"><img class="special-intro-runes" src="${WALPURGIS_RUNES_SRC}" alt=""></div></div>
-      <div class="special-intro-white"></div>
-      <div class="special-intro-negative"></div>`;
-    this.document.head.append(style);
+      <div class="special-intro-white"></div>`;
     this.document.body.append(overlay);
     return overlay;
+  }
+
+  _createNegativeLayer() {
+    const existing = this.document?.querySelector?.('#special-intro-global-negative');
+    if (existing) return existing;
+    if (!this.document?.body) return null;
+
+    if (!this.document.querySelector('#special-intro-global-negative-style')) {
+      const style = this.document.createElement('style');
+      style.id = 'special-intro-global-negative-style';
+      style.textContent = `
+#special-intro-global-negative{position:fixed;inset:0;z-index:2147483647;pointer-events:none;background:#fff;mix-blend-mode:difference;opacity:1;transition:none!important;animation:none!important}
+#special-intro-global-negative[hidden]{display:none!important}
+`;
+      this.document.head.append(style);
+    }
+
+    const layer = this.document.createElement('div');
+    layer.id = 'special-intro-global-negative';
+    layer.hidden = true;
+    layer.setAttribute('aria-hidden', 'true');
+    this.document.body.append(layer);
+    return layer;
   }
 
   _installControls() {
@@ -215,10 +285,8 @@ export class SpecialSummonIntro {
         <div class="special-intro-tuner-panel">
           <label>全体 <input data-key="durationMs" type="range" min="1500" max="6000" step="100"><output></output></label>
           <label>本体出現 <input data-key="appearPct" type="range" min="0" max="55" step="1"><output></output></label>
-          <label>本体消去 <input data-key="disappearPct" type="range" min="25" max="100" step="1"><output></output></label>
           <label>文字開始 <input data-key="titlePct" type="range" min="5" max="80" step="1"><output></output></label>
-          <label>反転開始 <input data-key="invertPct" type="range" min="10" max="90" step="1"><output></output></label>
-          <label>反転時間 <input data-key="invertDurationPct" type="range" min="3" max="35" step="1"><output></output></label>
+          <label>名前完成→反転 <input data-key="invertPct" type="range" min="10" max="90" step="1"><output></output></label>
           <div class="special-intro-tuner-actions">
             <button type="button" class="quiet" data-action="reset">初期値</button>
             <button type="button" class="primary" data-action="preview">この設定で再生</button>
@@ -262,9 +330,30 @@ export class SpecialSummonIntro {
     return this.document?.querySelector?.('#top-player.active, #bottom-player.active')?.dataset?.character ?? null;
   }
 
-  _waitForVoice(characterId) {
-    const audio = this.voices[characterId];
-    if (!audio) return Promise.resolve(false);
+  async _voiceForCharacter(characterId) {
+    if (characterId !== 'madoka') return this.voices[characterId] ?? null;
+    const audio = this.voices.madoka;
+    try {
+      const src = await Promise.race([
+        loadMadokaVoiceSource(),
+        timeoutResult(VOICE_PREP_TIMEOUT_MS, null),
+      ]);
+      if (!src) return null;
+      if (audio.src !== src) {
+        audio.pause();
+        audio.src = src;
+        audio.load?.();
+      }
+      return audio;
+    } catch (error) {
+      console.warn('Failed to load verified Madoka summon voice', error);
+      return null;
+    }
+  }
+
+  async _waitForVoice(characterId) {
+    const audio = await this._voiceForCharacter(characterId);
+    if (!audio) return false;
 
     this.currentVoice = audio;
     audio.pause();
@@ -284,7 +373,7 @@ export class SpecialSummonIntro {
       const onError = () => done(false);
       audio.addEventListener?.('ended', onEnded, { once: true });
       audio.addEventListener?.('error', onError, { once: true });
-      this.voiceTimer = NATIVE_SET_TIMEOUT(() => done(true), 30000);
+      this.voiceTimer = NATIVE_SET_TIMEOUT(() => done(true), VOICE_PLAYBACK_TIMEOUT_MS);
       try {
         const result = audio.play();
         if (result?.catch) result.catch(() => done(false));
@@ -302,76 +391,72 @@ export class SpecialSummonIntro {
   _animateScene() {
     if (!this.overlay) return;
     this._cancelAnimations();
+    NATIVE_CLEAR_TIMEOUT(this.nameCompleteTimer);
+    this.nameCompleteTimer = null;
+    if (this.negativeLayer) this.negativeLayer.hidden = true;
+
     const duration = this.timing.durationMs;
     const appear = pct(this.timing.appearPct);
-    const disappear = clamp01(Math.max(appear + .18, pct(this.timing.disappearPct)));
-    const title = pct(this.timing.titlePct);
-    const invert = pct(this.timing.invertPct);
-    const invertEnd = clamp01(invert + pct(this.timing.invertDurationPct));
-    const titleHoldEnd = clamp01(Math.max(title + .12, Math.min(invertEnd + .03, .88)));
-    const titleFadeEnd = clamp01(Math.min(titleHoldEnd + .06, .96));
+    const titleStart = Math.max(appear + 0.08, Math.min(pct(this.timing.titlePct), 0.88));
+    const nameComplete = Math.min(1, Math.max(titleStart + 0.03, pct(this.timing.invertPct)));
+    const titleLead = Math.max(0, titleStart - 0.015);
+    const enemyVisible = Math.min(titleStart, appear + 0.08);
 
     const enemy = this.overlay.querySelector('.special-intro-enemy');
     const pink = this.overlay.querySelector('.special-intro-pink');
     const white = this.overlay.querySelector('.special-intro-white');
     const titleLayer = this.overlay.querySelector('.special-intro-title');
     const brush = this.overlay.querySelector('.special-intro-brush');
-    const negative = this.overlay.querySelector('.special-intro-negative');
 
     this.animations.push(
       animateKeyframes(enemy, [
         { opacity: 0, filter: 'brightness(1.6) blur(2px) drop-shadow(0 0 20px rgba(255,70,180,.8))', offset: 0 },
         { opacity: 0, filter: 'brightness(1.6) blur(2px) drop-shadow(0 0 20px rgba(255,70,180,.8))', offset: appear },
-        { opacity: 1, filter: 'brightness(1.3) blur(0) drop-shadow(0 14px 20px rgba(0,0,0,.65))', offset: clamp01(appear + .08) },
-        { opacity: 1, filter: 'brightness(1) drop-shadow(0 14px 20px rgba(0,0,0,.7))', offset: clamp01(appear + .16) },
-        { opacity: 1, filter: 'brightness(1) drop-shadow(0 14px 20px rgba(0,0,0,.7))', offset: clamp01(disappear - .04) },
-        { opacity: 0, filter: 'brightness(1) drop-shadow(0 14px 20px rgba(0,0,0,.7))', offset: disappear },
-        { opacity: 0, filter: 'brightness(1) drop-shadow(0 14px 20px rgba(0,0,0,.7))', offset: 1 },
+        { opacity: 1, filter: 'brightness(1.25) blur(0) drop-shadow(0 14px 20px rgba(0,0,0,.65))', offset: enemyVisible },
+        { opacity: 1, filter: 'brightness(1) drop-shadow(0 14px 20px rgba(0,0,0,.7))', offset: Math.min(1, enemyVisible + 0.06) },
+        { opacity: 1, filter: 'brightness(1) drop-shadow(0 14px 20px rgba(0,0,0,.7))', offset: 1 },
       ], { duration, fill: 'both', easing: 'linear' }),
       animateKeyframes(pink, [
         { opacity: 0, offset: 0 },
-        { opacity: 0, offset: clamp01(appear - .03) },
-        { opacity: .15, offset: appear },
-        { opacity: 1, offset: clamp01(appear + .04) },
-        { opacity: .25, offset: clamp01(appear + .09) },
-        { opacity: 0, offset: clamp01(appear + .14) },
+        { opacity: 0, offset: Math.max(0, appear - 0.03) },
+        { opacity: 0.15, offset: appear },
+        { opacity: 1, offset: Math.min(1, appear + 0.04) },
+        { opacity: 0.25, offset: Math.min(1, appear + 0.09) },
+        { opacity: 0, offset: Math.min(1, appear + 0.14) },
         { opacity: 0, offset: 1 },
       ], { duration, fill: 'both', easing: 'linear' }),
       animateKeyframes(white, [
         { opacity: 0, offset: 0 },
-        { opacity: 0, offset: clamp01(appear + .02) },
-        { opacity: .85, offset: clamp01(appear + .06) },
-        { opacity: 0, offset: clamp01(appear + .09) },
-        { opacity: 0, offset: clamp01(invert - .02) },
-        { opacity: .18, offset: clamp01(invert - .01) },
-        { opacity: 0, offset: invert },
+        { opacity: 0, offset: Math.max(0, appear + 0.02) },
+        { opacity: 0.85, offset: Math.min(1, appear + 0.06) },
+        { opacity: 0, offset: Math.min(1, appear + 0.09) },
         { opacity: 0, offset: 1 },
       ], { duration, fill: 'both', easing: 'linear' }),
       animateKeyframes(titleLayer, [
         { opacity: 0, offset: 0 },
-        { opacity: 0, offset: clamp01(title - .02) },
-        { opacity: 1, offset: title },
-        { opacity: 1, offset: titleHoldEnd },
-        { opacity: 0, offset: titleFadeEnd },
-        { opacity: 0, offset: 1 },
-      ], { duration, fill: 'both', easing: 'ease-out' }),
+        { opacity: 0, offset: titleLead },
+        { opacity: 1, offset: titleStart },
+        { opacity: 1, offset: nameComplete },
+        { opacity: 1, offset: 1 },
+      ], { duration, fill: 'both', easing: 'linear' }),
       animateKeyframes(brush, [
         { transform: 'translateX(16vw) scaleX(.25)', opacity: 0, offset: 0 },
-        { transform: 'translateX(16vw) scaleX(.25)', opacity: 0, offset: clamp01(title - .02) },
-        { transform: 'translateX(0) scaleX(1)', opacity: 1, offset: title },
-        { transform: 'translateX(0) scaleX(1)', opacity: 1, offset: titleHoldEnd },
-        { transform: 'translateX(-4vw) scaleX(.95)', opacity: 0, offset: titleFadeEnd },
-        { transform: 'translateX(-4vw) scaleX(.95)', opacity: 0, offset: 1 },
+        { transform: 'translateX(16vw) scaleX(.25)', opacity: 0, offset: titleLead },
+        { transform: 'translateX(12vw) scaleX(.35)', opacity: 0.2, offset: titleStart },
+        { transform: 'translateX(0) scaleX(1)', opacity: 1, offset: nameComplete },
+        { transform: 'translateX(0) scaleX(1)', opacity: 1, offset: 1 },
       ], { duration, fill: 'both', easing: 'ease-out' }),
-      animateKeyframes(negative, [
-        { opacity: 0, offset: 0 },
-        { opacity: 0, offset: clamp01(invert - .001) },
-        { opacity: 1, offset: invert },
-        { opacity: 1, offset: invertEnd },
-        { opacity: 0, offset: clamp01(invertEnd + .001) },
-        { opacity: 0, offset: 1 },
-      ], { duration, fill: 'both', easing: 'steps(1, end)' }),
     );
+
+    const completeMs = Math.round(duration * nameComplete);
+    this.nameCompleteTimer = NATIVE_SET_TIMEOUT(() => {
+      if (this.overlay?.hidden) return;
+      if (this.negativeLayer) this.negativeLayer.hidden = false;
+      this.window?.dispatchEvent?.(new CustomEvent('duel:special-name-complete', {
+        detail: { nameComplete, durationMs: duration },
+      }));
+      this.nameCompleteTimer = null;
+    }, completeMs);
   }
 
   _startScene({ startBgm = true, preview = false } = {}) {
@@ -384,6 +469,7 @@ export class SpecialSummonIntro {
     this.sceneTimer = NATIVE_SET_TIMEOUT(() => this._finish(), this.timing.durationMs);
     try {
       if (startBgm) this.window?.dispatchEvent?.(new CustomEvent('duel:special-bgm'));
+      if (this.negativeLayer) this.negativeLayer.hidden = true;
       this.overlay.hidden = false;
       nextFrame(this.overlay);
       this._animateScene();
@@ -403,8 +489,10 @@ export class SpecialSummonIntro {
   _finish({ notifyGame = true } = {}) {
     NATIVE_CLEAR_TIMEOUT(this.sceneTimer);
     NATIVE_CLEAR_TIMEOUT(this.voiceTimer);
+    NATIVE_CLEAR_TIMEOUT(this.nameCompleteTimer);
     this.sceneTimer = null;
     this.voiceTimer = null;
+    this.nameCompleteTimer = null;
     this._cancelAnimations();
     if (this.currentVoice) {
       this.currentVoice.pause();
@@ -412,6 +500,7 @@ export class SpecialSummonIntro {
       this.currentVoice = null;
     }
     if (this.overlay) this.overlay.hidden = true;
+    if (this.negativeLayer) this.negativeLayer.hidden = true;
     const wasRunning = this.running;
     this.running = false;
     this.previewing = false;
@@ -425,10 +514,14 @@ export class SpecialSummonIntro {
     if (this.running) return false;
     this.running = true;
     globalThis.__duelCutsceneActive = true;
-    const characterId = this._characterIdForEvent(event);
-    await this._waitForVoice(characterId);
-    if (!this.running) return true;
-    this._startScene({ startBgm: true, preview: false });
+    try {
+      const characterId = this._characterIdForEvent(event);
+      await this._waitForVoice(characterId);
+      if (this.running) this._startScene({ startBgm: true, preview: false });
+    } catch (error) {
+      console.warn('Special summon intro failed before scene start; resuming duel.', error);
+      this._finish();
+    }
     return true;
   }
 
@@ -442,7 +535,12 @@ function bootstrap() {
   if (typeof window === 'undefined' || typeof document === 'undefined' || typeof Audio === 'undefined') return;
   installCutsceneTimerGate(window);
   const intro = new SpecialSummonIntro();
-  window.addEventListener('duel:event', event => intro.handleEvent(event.detail));
+  window.addEventListener('duel:event', event => {
+    intro.handleEvent(event.detail).catch(error => {
+      console.warn('Unhandled special summon intro error; resuming duel.', error);
+      intro.reset();
+    });
+  });
   document.addEventListener('click', event => {
     const button = event.target.closest?.('button');
     if (!button) return;
