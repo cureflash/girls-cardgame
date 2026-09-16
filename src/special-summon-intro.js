@@ -20,38 +20,6 @@ const VOICE_PLAYBACK_TIMEOUT_MS = 30000;
 const NATIVE_SET_TIMEOUT = globalThis.setTimeout?.bind(globalThis);
 const NATIVE_CLEAR_TIMEOUT = globalThis.clearTimeout?.bind(globalThis);
 
-export function installCutsceneTimerGate(windowRef = globalThis.window) {
-  if (!windowRef || windowRef.__duelCutsceneTimerGateInstalled) return;
-  windowRef.__duelCutsceneTimerGateInstalled = true;
-  const deferred = new Map();
-  let nextToken = -1;
-
-  windowRef.setTimeout = (callback, delay = 0, ...args) => {
-    if (globalThis.__duelCutsceneActive && Number(delay) === 450) {
-      const token = nextToken--;
-      const resume = () => {
-        if (!deferred.has(token)) return;
-        deferred.delete(token);
-        NATIVE_SET_TIMEOUT(callback, 0, ...args);
-      };
-      deferred.set(token, resume);
-      windowRef.addEventListener('duel:cutscene-end', resume, { once: true });
-      return token;
-    }
-    return NATIVE_SET_TIMEOUT(callback, delay, ...args);
-  };
-
-  windowRef.clearTimeout = token => {
-    const resume = deferred.get(token);
-    if (resume) {
-      windowRef.removeEventListener('duel:cutscene-end', resume);
-      deferred.delete(token);
-      return;
-    }
-    NATIVE_CLEAR_TIMEOUT(token);
-  };
-}
-
 export const DOPPEL_VOICE_SOURCES = Object.freeze({
   madoka: 'verified-chunks',
   mami: './assets/audio/doppel/mami.mp3?v=doppel3',
@@ -533,7 +501,6 @@ export class SpecialSummonIntro {
 
 function bootstrap() {
   if (typeof window === 'undefined' || typeof document === 'undefined' || typeof Audio === 'undefined') return;
-  installCutsceneTimerGate(window);
   const intro = new SpecialSummonIntro();
   window.addEventListener('duel:event', event => {
     intro.handleEvent(event.detail).catch(error => {
