@@ -82,7 +82,7 @@ export class BattleBgm {
   }
 
   unlock() {
-    if (!this.current?.paused) return;
+    if (!this.current?.paused || !this.blocked) return;
     if (this.current.ended) this.current.currentTime = 0;
     this._play(this.current);
   }
@@ -102,20 +102,40 @@ function bootstrap() {
     window.dispatchEvent(new CustomEvent('duel:normal-bgm-started'));
   });
 
+  const restartButton = target => {
+    const button = target?.closest?.('button');
+    if (!button) return null;
+    const gameOver = document.querySelector('#turn-name')?.textContent === 'デュエル終了';
+    return button.id === 'confirm-restart'
+      || (button.id === 'new-game' && gameOver)
+      || (button.closest('#actions') && button.textContent === 'もう一度対戦')
+      ? button
+      : null;
+  };
+
   bgm.startGame();
   window.addEventListener('duel:event', event => bgm.handleEvent(event.detail));
   window.addEventListener('duel:special-bgm', () => bgm.startSpecial());
-  document.addEventListener('pointerdown', () => bgm.unlock(), { passive: true });
-  document.addEventListener('keydown', () => bgm.unlock());
+
+  // On a restarted duel the previous gameOver event has already cleared `current`.
+  // Starting on pointerdown keeps the new play() call inside the first user-activation
+  // event instead of waiting until click, where Safari can intermittently reject it.
+  document.addEventListener('pointerdown', event => {
+    if (restartButton(event.target)) bgm.startGame();
+    else bgm.unlock();
+  }, { passive: true });
+
+  document.addEventListener('keydown', event => {
+    if ((event.key === 'Enter' || event.key === ' ') && restartButton(event.target)) bgm.startGame();
+    else bgm.unlock();
+  });
+
+  // click is a fallback for keyboard/synthetic activation and a same-gesture retry
+  // only when the pointerdown/keydown play attempt was actually blocked.
   document.addEventListener('click', event => {
-    const button = event.target.closest?.('button');
-    if (!button) return;
-    const gameOver = document.querySelector('#turn-name')?.textContent === 'デュエル終了';
-    if (button.id === 'confirm-restart'
-      || (button.id === 'new-game' && gameOver)
-      || (button.closest('#actions') && button.textContent === 'もう一度対戦')) {
-      bgm.startGame();
-    }
+    if (!restartButton(event.target)) return;
+    if (bgm.current !== bgm.normal) bgm.startGame();
+    else bgm.unlock();
   }, true);
 }
 
