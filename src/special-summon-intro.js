@@ -91,6 +91,22 @@ function nextFrame(element) {
   void element?.offsetWidth;
 }
 
+function monotonicKeyframes(keyframes) {
+  let previous = 0;
+  return keyframes.map((frame, index) => {
+    const requested = Number(frame.offset);
+    const clamped = Number.isFinite(requested) ? clamp01(requested) : previous;
+    const offset = index === 0 ? clamped : Math.max(previous, clamped);
+    previous = offset;
+    return { ...frame, offset };
+  });
+}
+
+function animateKeyframes(element, keyframes, options) {
+  if (!element?.animate) return null;
+  return element.animate(monotonicKeyframes(keyframes), options);
+}
+
 export class SpecialSummonIntro {
   constructor({
     documentRef = globalThis.document,
@@ -303,7 +319,7 @@ export class SpecialSummonIntro {
     const negative = this.overlay.querySelector('.special-intro-negative');
 
     this.animations.push(
-      enemy.animate([
+      animateKeyframes(enemy, [
         { opacity: 0, filter: 'brightness(1.6) blur(2px) drop-shadow(0 0 20px rgba(255,70,180,.8))', offset: 0 },
         { opacity: 0, filter: 'brightness(1.6) blur(2px) drop-shadow(0 0 20px rgba(255,70,180,.8))', offset: appear },
         { opacity: 1, filter: 'brightness(1.3) blur(0) drop-shadow(0 14px 20px rgba(0,0,0,.65))', offset: clamp01(appear + .08) },
@@ -312,7 +328,7 @@ export class SpecialSummonIntro {
         { opacity: 0, filter: 'brightness(1) drop-shadow(0 14px 20px rgba(0,0,0,.7))', offset: disappear },
         { opacity: 0, filter: 'brightness(1) drop-shadow(0 14px 20px rgba(0,0,0,.7))', offset: 1 },
       ], { duration, fill: 'both', easing: 'linear' }),
-      pink.animate([
+      animateKeyframes(pink, [
         { opacity: 0, offset: 0 },
         { opacity: 0, offset: clamp01(appear - .03) },
         { opacity: .15, offset: appear },
@@ -321,7 +337,7 @@ export class SpecialSummonIntro {
         { opacity: 0, offset: clamp01(appear + .14) },
         { opacity: 0, offset: 1 },
       ], { duration, fill: 'both', easing: 'linear' }),
-      white.animate([
+      animateKeyframes(white, [
         { opacity: 0, offset: 0 },
         { opacity: 0, offset: clamp01(appear + .02) },
         { opacity: .85, offset: clamp01(appear + .06) },
@@ -331,7 +347,7 @@ export class SpecialSummonIntro {
         { opacity: 0, offset: invert },
         { opacity: 0, offset: 1 },
       ], { duration, fill: 'both', easing: 'linear' }),
-      titleLayer.animate([
+      animateKeyframes(titleLayer, [
         { opacity: 0, offset: 0 },
         { opacity: 0, offset: clamp01(title - .02) },
         { opacity: 1, offset: title },
@@ -339,7 +355,7 @@ export class SpecialSummonIntro {
         { opacity: 0, offset: titleFadeEnd },
         { opacity: 0, offset: 1 },
       ], { duration, fill: 'both', easing: 'ease-out' }),
-      brush.animate([
+      animateKeyframes(brush, [
         { transform: 'translateX(16vw) scaleX(.25)', opacity: 0, offset: 0 },
         { transform: 'translateX(16vw) scaleX(.25)', opacity: 0, offset: clamp01(title - .02) },
         { transform: 'translateX(0) scaleX(1)', opacity: 1, offset: title },
@@ -347,7 +363,7 @@ export class SpecialSummonIntro {
         { transform: 'translateX(-4vw) scaleX(.95)', opacity: 0, offset: titleFadeEnd },
         { transform: 'translateX(-4vw) scaleX(.95)', opacity: 0, offset: 1 },
       ], { duration, fill: 'both', easing: 'ease-out' }),
-      negative.animate([
+      animateKeyframes(negative, [
         { opacity: 0, offset: 0 },
         { opacity: 0, offset: clamp01(invert - .001) },
         { opacity: 1, offset: invert },
@@ -363,13 +379,18 @@ export class SpecialSummonIntro {
       if (!preview) this._finish();
       return;
     }
-    if (startBgm) this.window?.dispatchEvent?.(new CustomEvent('duel:special-bgm'));
     this.previewing = preview;
-    this.overlay.hidden = false;
-    nextFrame(this.overlay);
-    this._animateScene();
     NATIVE_CLEAR_TIMEOUT(this.sceneTimer);
     this.sceneTimer = NATIVE_SET_TIMEOUT(() => this._finish(), this.timing.durationMs);
+    try {
+      if (startBgm) this.window?.dispatchEvent?.(new CustomEvent('duel:special-bgm'));
+      this.overlay.hidden = false;
+      nextFrame(this.overlay);
+      this._animateScene();
+    } catch (error) {
+      console.warn('Special summon intro failed; resuming duel.', error);
+      this._finish();
+    }
   }
 
   preview() {
