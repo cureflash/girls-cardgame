@@ -31,6 +31,7 @@ test('Doppel voices currently exist for Madoka and Mami only', () => {
     assert.equal(DOPPEL_VOICE_SOURCES[id], null);
     assert.equal(doppelVoiceSource(id), null);
   }
+  assert.equal(existsSync(`${root}/assets/audio/doppel/madoka.mp3`), false);
 });
 
 test('intro timing keeps only active controls and clamps supported ranges', () => {
