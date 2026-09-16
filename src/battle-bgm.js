@@ -15,6 +15,7 @@ export class BattleBgm {
     this.special.preload = 'auto';
     this.current = null;
     this.blocked = false;
+    this.specialStarted = false;
 
     this.special.addEventListener?.('ended', () => {
       if (this.current === this.special) this._restartSpecial();
@@ -57,10 +58,14 @@ export class BattleBgm {
   startGame() {
     this._reset(this.normal);
     this._reset(this.special);
+    this.specialStarted = false;
     this._play(this.normal);
   }
 
   prepareSpecial() {
+    // Summon cutscenes still run every time, but once special BGM has started,
+    // later Walpurgis/Salvation summons must not pause or rewind it.
+    if (this.specialStarted) return;
     this._reset(this.normal);
     this._reset(this.special);
     this.current = null;
@@ -68,6 +73,10 @@ export class BattleBgm {
   }
 
   startSpecial() {
+    // duel:special-bgm is emitted for every special summon intro. Treat only
+    // the first one in a duel as the actual normal -> special BGM transition.
+    if (this.specialStarted) return;
+    this.specialStarted = true;
     this._reset(this.normal);
     this._reset(this.special);
     this._play(this.special);
