@@ -108,8 +108,12 @@ test('scene setup failure releases the cutscene lock instead of freezing the due
   assert.deepEqual(dispatched, ['duel:cutscene-end']);
 });
 
-test('obsolete intro override modules are no longer shipped by the page', () => {
+test('obsolete intro controllers and timer monkeypatch are removed', () => {
   const index = readFileSync(`${root}/index.html`, 'utf8');
+  const app = readFileSync(`${root}/src/app.js`, 'utf8');
+  const intro = readFileSync(`${root}/src/special-summon-intro.js`, 'utf8');
+
+  assert.match(index, /app\.js\?v=homura7/);
   assert.match(index, /special-summon-intro\.js\?v=special-intro7/);
   assert.doesNotMatch(index, /special-intro-screen\.js/);
   assert.doesNotMatch(index, /special-intro-sequence\.js/);
@@ -117,4 +121,10 @@ test('obsolete intro override modules are no longer shipped by the page', () => 
   assert.equal(existsSync(`${root}/src/special-intro-screen.js`), false);
   assert.equal(existsSync(`${root}/src/special-intro-sequence.js`), false);
   assert.equal(existsSync(`${root}/src/madoka-doppel-voice.js`), false);
+
+  assert.match(app, /globalThis\.__duelCutsceneActive/);
+  assert.match(app, /addEventListener\('duel:cutscene-end', scheduleAI\)/);
+  assert.doesNotMatch(intro, /installCutsceneTimerGate/);
+  assert.doesNotMatch(intro, /windowRef\.setTimeout/);
+  assert.doesNotMatch(intro, /windowRef\.clearTimeout/);
 });
