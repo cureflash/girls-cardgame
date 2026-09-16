@@ -122,7 +122,7 @@ function finishAction() {
 
 function scheduleAI() {
   clearTimeout(timer);
-  if (mode === 'local' || engine.state.phase === PHASES.GAME_OVER || humanTurn()) return;
+  if (mode === 'local' || engine.state.phase === PHASES.GAME_OVER || humanTurn() || globalThis.__duelCutsceneActive) return;
   const duel = generation;
   timer = setTimeout(() => {
     if (duel !== generation) return;
@@ -505,5 +505,6 @@ $('#policy-file').onchange = async event => {
   event.target.value = '';
 };
 document.addEventListener('keydown', event => { if (event.key === 'Escape' && !engine.state.pendingDecision) { clear(); render(); } });
+window.addEventListener('duel:cutscene-end', scheduleAI);
 $('#seat').disabled = $('#mode').value === 'local';
 start();
