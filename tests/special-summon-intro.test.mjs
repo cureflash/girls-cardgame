@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import {
   DEFAULT_INTRO_TIMING,
   DOPPEL_VOICE_SOURCES,
@@ -10,6 +12,7 @@ import {
 } from '../src/special-summon-intro.js';
 
 const event = (type, code, id = 'player-madoka-1') => ({ type, card: { code, id } });
+const root = fileURLToPath(new URL('..', import.meta.url));
 
 test('special summon intro targets Walpurgis and Salvation Witch on summon or revive', () => {
   assert.equal(isSpecialWitchSummon(event('summon', 'witch-walpurgis_13')), true);
@@ -22,7 +25,7 @@ test('special summon intro targets Walpurgis and Salvation Witch on summon or re
 });
 
 test('Doppel voices currently exist for Madoka and Mami only', () => {
-  assert.match(doppelVoiceSource('madoka'), /madoka\.mp3/);
+  assert.equal(doppelVoiceSource('madoka'), 'verified-chunks');
   assert.match(doppelVoiceSource('mami'), /mami\.mp3/);
   for (const id of ['sayaka', 'kyoko', 'homura', 'nagisa']) {
     assert.equal(DOPPEL_VOICE_SOURCES[id], null);
@@ -30,14 +33,17 @@ test('Doppel voices currently exist for Madoka and Mami only', () => {
   }
 });
 
-test('intro timing sliders are clamped to supported ranges', () => {
+test('intro timing keeps only active controls and clamps supported ranges', () => {
   assert.deepEqual(normalizeIntroTiming({}), DEFAULT_INTRO_TIMING);
+  assert.deepEqual(
+    normalizeIntroTiming({ disappearPct: 25, invertDurationPct: 35 }),
+    DEFAULT_INTRO_TIMING,
+  );
   assert.equal(normalizeIntroTiming({ durationMs: 999 }).durationMs, 1500);
   assert.equal(normalizeIntroTiming({ durationMs: 9999 }).durationMs, 6000);
   assert.equal(normalizeIntroTiming({ appearPct: -10 }).appearPct, 0);
   assert.equal(normalizeIntroTiming({ titlePct: 99 }).titlePct, 80);
   assert.equal(normalizeIntroTiming({ invertPct: 99 }).invertPct, 90);
-  assert.equal(normalizeIntroTiming({ invertDurationPct: 1 }).invertDurationPct, 3);
 });
 
 test('extreme intro timing never sends decreasing Web Animation offsets', () => {
@@ -47,7 +53,6 @@ test('extreme intro timing never sends decreasing Web Animation offsets', () => 
     '.special-intro-white',
     '.special-intro-title',
     '.special-intro-brush',
-    '.special-intro-negative',
   ];
   const elements = Object.fromEntries(selectors.map(selector => [selector, {
     animate(keyframes) {
@@ -62,27 +67,31 @@ test('extreme intro timing never sends decreasing Web Animation offsets', () => 
 
   const intro = Object.create(SpecialSummonIntro.prototype);
   intro.overlay = { querySelector: selector => elements[selector] };
+  intro.negativeLayer = { hidden: true };
   intro.animations = [];
+  intro.nameCompleteTimer = null;
+  intro.window = { dispatchEvent() {} };
   intro.timing = normalizeIntroTiming({
     durationMs: 1500,
     appearPct: 55,
-    disappearPct: 25,
     titlePct: 80,
     invertPct: 10,
-    invertDurationPct: 35,
   });
 
   assert.doesNotThrow(() => intro._animateScene());
+  clearTimeout(intro.nameCompleteTimer);
 });
 
 test('scene setup failure releases the cutscene lock instead of freezing the duel', () => {
   const dispatched = [];
   const intro = Object.create(SpecialSummonIntro.prototype);
   intro.overlay = { hidden: true };
+  intro.negativeLayer = { hidden: true };
   intro.window = { dispatchEvent: value => dispatched.push(value.type) };
   intro.timing = { durationMs: 1500 };
   intro.sceneTimer = null;
   intro.voiceTimer = null;
+  intro.nameCompleteTimer = null;
   intro.currentVoice = null;
   intro.animations = [];
   intro.running = true;
@@ -93,7 +102,19 @@ test('scene setup failure releases the cutscene lock instead of freezing the due
   intro._startScene({ startBgm: false, preview: false });
 
   assert.equal(intro.overlay.hidden, true);
+  assert.equal(intro.negativeLayer.hidden, true);
   assert.equal(intro.running, false);
   assert.equal(globalThis.__duelCutsceneActive, false);
   assert.deepEqual(dispatched, ['duel:cutscene-end']);
+});
+
+test('obsolete intro override modules are no longer shipped by the page', () => {
+  const index = readFileSync(`${root}/index.html`, 'utf8');
+  assert.match(index, /special-summon-intro\.js\?v=special-intro7/);
+  assert.doesNotMatch(index, /special-intro-screen\.js/);
+  assert.doesNotMatch(index, /special-intro-sequence\.js/);
+  assert.doesNotMatch(index, /madoka-doppel-voice\.js/);
+  assert.equal(existsSync(`${root}/src/special-intro-screen.js`), false);
+  assert.equal(existsSync(`${root}/src/special-intro-sequence.js`), false);
+  assert.equal(existsSync(`${root}/src/madoka-doppel-voice.js`), false);
 });
