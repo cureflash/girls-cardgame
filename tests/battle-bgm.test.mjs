@@ -47,7 +47,7 @@ test('special BGM target is Walpurgis or Salvation Witch on summon or revive', (
   assert.equal(shouldStartSpecialBgm(special('witch-rose_garden_8')), false);
 });
 
-test('target appearance stops normal BGM but waits for the intro to start special BGM', () => {
+test('first target appearance stops normal BGM but waits for the intro to start special BGM', () => {
   const bgm = new BattleBgm({ normalSrc: 'normal', specialSrc: 'special', AudioCtor: FakeAudio });
   bgm.startGame();
   bgm.handleEvent(special('witch-walpurgis_13'));
@@ -60,7 +60,7 @@ test('target appearance stops normal BGM but waits for the intro to start specia
   assert.equal(bgm.special.playCount, 1);
 });
 
-test('revived target also stops normal BGM before its intro', () => {
+test('first revived target also stops normal BGM before its intro', () => {
   const bgm = new BattleBgm({ normalSrc: 'normal', specialSrc: 'special', AudioCtor: FakeAudio });
   bgm.startGame();
   bgm.handleEvent(special('witch-salvation_13', 'revive'));
@@ -69,17 +69,21 @@ test('revived target also stops normal BGM before its intro', () => {
   assert.equal(bgm.special.playCount, 0);
 });
 
-test('a second target summon restarts special BGM after its intro', () => {
+test('later target summons do not pause, rewind, or restart special BGM', () => {
   const bgm = new BattleBgm({ normalSrc: 'normal', specialSrc: 'special', AudioCtor: FakeAudio });
   bgm.startGame();
   bgm.handleEvent(special('witch-walpurgis_13'));
   bgm.startSpecial();
   bgm.special.currentTime = 8;
+
   bgm.handleEvent(special('witch-salvation_13'));
-  assert.equal(bgm.current, null);
-  assert.equal(bgm.special.currentTime, 0);
+  assert.equal(bgm.current, bgm.special);
+  assert.equal(bgm.special.currentTime, 8);
+  assert.equal(bgm.special.paused, false);
+
   bgm.startSpecial();
-  assert.equal(bgm.special.playCount, 2);
+  assert.equal(bgm.special.currentTime, 8);
+  assert.equal(bgm.special.playCount, 1);
   assert.equal(bgm.special.paused, false);
 });
 
@@ -110,7 +114,7 @@ test('game over stops all BGM', () => {
   assert.equal(bgm.special.currentTime, 0);
 });
 
-test('starting a new game stops special and returns to normal from the beginning', () => {
+test('starting a new game stops special and allows a fresh first transition', () => {
   const bgm = new BattleBgm({ normalSrc: 'normal', specialSrc: 'special', AudioCtor: FakeAudio });
   bgm.startGame();
   bgm.handleEvent(special('witch-salvation_13'));
@@ -123,6 +127,12 @@ test('starting a new game stops special and returns to normal from the beginning
   assert.equal(bgm.special.currentTime, 0);
   assert.equal(bgm.special.paused, true);
   assert.equal(bgm.normal.playCount, 2);
+  assert.equal(bgm.specialStarted, false);
+
+  bgm.handleEvent(special('witch-walpurgis_13'));
+  bgm.startSpecial();
+  assert.equal(bgm.special.playCount, 2);
+  assert.equal(bgm.specialStarted, true);
 });
 
 test('a rejected normal BGM start can be retried by the same restart interaction', async () => {
