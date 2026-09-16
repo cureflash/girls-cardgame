@@ -75,20 +75,14 @@ function bootstrap() {
   };
 
   // Start voice one second after the normal battle BGM has actually begun playing.
-  // This replaces the old behavior that triggered on the first hand-card pointerdown.
   window.addEventListener('duel:normal-bgm-started', scheduleAfterBgm);
 
-  document.addEventListener('click', event => {
-    const button = event.target.closest?.('button');
-    if (!button) return;
-    const gameOver = document.querySelector('#turn-name')?.textContent === 'デュエル終了';
-    if (button.id === 'confirm-restart'
-      || (button.id === 'new-game' && gameOver)
-      || (button.closest('#actions') && button.textContent === 'もう一度対戦')) {
-      cancelPending();
-      openingVoice.reset();
-    }
-  }, true);
+  // Battle BGM emits this synchronously before restarting, so an earlier game's
+  // pending/opening voice cannot cancel the new game's BGM-start schedule later.
+  window.addEventListener('duel:audio-restart', () => {
+    cancelPending();
+    openingVoice.reset();
+  });
 }
 
 bootstrap();
