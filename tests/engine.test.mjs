@@ -298,20 +298,33 @@ test('both specials are usable only once per duel', () => {
   }
 });
 
-test('exact zero and overdraw immediately lose without losing card records', () => {
-  for (const [count, damage] of [[1,false],[2,false],[1,true],[2,true],[10,true]]) {
+test('drawing to zero or overdraw does not end the duel and preserves card records', () => {
+  for (const count of [1,2]) {
     const e=engine(), p=e.player(0);
     p.deck=[familiar('last1',3), ...(count===1?[]:[familiar('last2',4)])];
     const total=p.deck.length+p.hand.length+p.graveyard.length;
-    if(damage) e.takeDeckDamage(0,count); else e.draw(0,count);
+    e.draw(0,count);
+    assert.equal(e.state.phase,PHASES.MAIN); assert.equal(e.state.winner,null);
+    assert.equal(p.deck.length,0); assert.equal(p.hand.length+p.graveyard.length,total);
+  }
+});
+
+test('deck damage reaching zero still loses without losing card records', () => {
+  for (const count of [1,2,10]) {
+    const e=engine(), p=e.player(0);
+    p.deck=[familiar('last1',3), ...(count===1?[]:[familiar('last2',4)])];
+    const total=p.deck.length+p.hand.length+p.graveyard.length;
+    e.takeDeckDamage(0,count);
     assert.equal(e.state.phase,PHASES.GAME_OVER); assert.equal(e.state.winner,1);
     assert.equal(p.deck.length,0); assert.equal(p.hand.length+p.graveyard.length,total);
   }
 });
 
-test('draw magic taking the last card ends the duel before priority changes', () => {
+test('draw magic taking the last card keeps the duel running and passes priority', () => {
   const e=engine(), p=e.player(0); p.deck=[familiar('last',3)]; p.hand=[drawTwo('draw')];
-  e.activateMainMagic(0,'draw'); assert.equal(e.state.winner,1); assert.equal(p.hand[0].id,'last');
+  e.activateMainMagic(0,'draw');
+  assert.equal(e.state.phase,PHASES.MAIN); assert.equal(e.state.winner,null);
+  assert.equal(p.hand[0].id,'last'); assert.equal(e.state.priorityPlayer,1);
 });
 
 test('invalid chain response is atomic and legal choices remain available', () => {
