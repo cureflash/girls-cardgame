@@ -96,7 +96,6 @@ export class GameEngine {
     }
     if (log) this.log(`${p.name}が${drawn}枚ドロー`);
     if (drawn) this.emit('draw', { player: playerIndex, count: drawn });
-    if (p.deck.length === 0) this.endGame(this.opponent(playerIndex), `${p.name}のデッキが尽きた`);
   }
 
   ensurePriority(playerIndex) {
