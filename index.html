@@ -12,7 +12,8 @@
     "imports": {
       "./src/card-data.js": "./src/card-data.js?v=homura6",
       "./src/baseline-ai.js": "./src/baseline-ai.js?v=homura6",
-      "./src/homura-ai.js": "./src/homura-ai.js?v=homura6"
+      "./src/homura-ai.js": "./src/homura-ai.js?v=homura6",
+      "./src/game-engine.js": "./src/game-engine.js?v=drawzero1"
     }
   }
   </script>
@@ -93,7 +94,7 @@
       <section class="inspection"><h2>カード詳細</h2><div id="card-detail"><p class="muted">カードに触れると、ここに詳細を表示します。</p><div class="detail-placeholder" aria-hidden="true">✦</div></div></section>
       <details class="history" open><summary>デュエルログ</summary><button id="export-log" class="quiet" type="button">解析用JSONを保存</button><ol id="log"></ol></details>
       <details class="rules"><summary>遊び方・キャラ能力</summary>
-        <p>山札がライフ。0枚になると敗北します。1ターン1体召喚、先攻1ターン目は攻撃できません。</p>
+        <p>山札がライフ。戦闘ダメージで山札が0枚になると敗北します。ドローで0枚になっても、その時点では敗北しません。1ターン1体召喚、先攻1ターン目は攻撃できません。</p>
         <p>魔女は場の使い魔・魔女と手札の使い魔を生贄にできます。盾を使うと、その戦闘では双方の参加モンスターが戦闘破壊されず、自分が受ける戦闘ダメージは0になります。発動した時点でチェーンを終了し、この戦闘の解決後にバトルフェイズを終了します。</p>
         <p>まどか：戦闘ダメージ−1。必殺技で墓地の使い魔・魔女1体を蘇生し、そのターン終了。</p>
         <p>マミ：初期手札−1。ティロ・フィナーレで相手の使い魔・魔女を全破壊し、そのターン終了。</p>
@@ -109,7 +110,7 @@
   <dialog id="restart"><h2>新しいデュエルを始めますか？</h2><p>現在の対戦は終了します。</p><div class="actions"><button id="cancel-restart" class="quiet">続ける</button><button id="confirm-restart" class="primary">新しく始める</button></div></dialog>
   <script type="module" src="./src/app.js?v=homura7"></script>
   <script type="module" src="./src/opening-voice.js?v=opening2"></script>
-  <script type="module" src="./src/battle-bgm.js?v=bgm6"></script>
+  <script type="module" src="./src/battle-bgm.js?v=bgm7"></script>
   <script type="module" src="./src/special-summon-intro.js?v=special-intro7"></script>
   <script type="module" src="./src/salvation-intro.js?v=salvation1"></script>
   <script type="module" src="./src/special-intro-layout.js?v=layout2"></script>
