@@ -8,20 +8,23 @@ import { chooseBaselineAction } from '../src/baseline-ai.js';
 
 function rngFor(seed) { return () => { seed = (Math.imul(seed,1664525)+1013904223)>>>0; return seed/4294967296; }; }
 
-test('both decks share 13/7/10 composition, no draw spell, and their own 13 witch; all images exist', () => {
+test('both forty-card decks keep the original monsters and art and add distinct ten-card packages', () => {
   const decks=['madoka','mami'].map(createDeck);
   for (const deck of decks) {
-    assert.equal(deck.length,30); assert.equal(new Set(deck.map(c=>c.id)).size,30);
+    assert.equal(deck.length,40); assert.equal(new Set(deck.map(c=>c.id)).size,40);
     assert.equal(deck.filter(c=>c.type==='familiar').length,13);
     assert.equal(deck.filter(c=>c.type==='witch').length,7);
-    assert.equal(deck.filter(c=>c.type==='magic').length,10);
+    assert.equal(deck.filter(c=>c.type==='magic').length,20);
     assert.equal(deck.filter(c=>c.effect==='draw').length,0);
     assert.equal(deck.filter(c=>c.type==='familiar'&&c.attack===3).length,5);
     assert.equal(deck.filter(c=>c.attack===13).length,1);
-    for(const card of deck) assert.ok(existsSync(new URL('../'+card.image.split('?')[0],import.meta.url)),card.image);
+    for(const card of deck) {
+      if (card.image) assert.ok(existsSync(new URL('../'+card.image.split('?')[0],import.meta.url)),card.image);
+      else assert.ok(card.description && card.badge && card.kind, card.name);
+    }
   }
   const gameplay = deck => deck.map(({type,attack,tributeThreshold,effect,value})=>({type,attack,tributeThreshold,effect,value}));
-  assert.deepEqual(gameplay(decks[0]),gameplay(decks[1]));
+  assert.deepEqual(gameplay(decks[0].slice(0,30)),gameplay(decks[1].slice(0,30)));
   assert.equal(decks[0].find(c=>c.attack===13).name,'救済の魔女');
   assert.equal(decks[1].find(c=>c.attack===13).name,'ワルプルギスの夜');
   assert.equal(decks[1].filter(c=>c.name==='芸術家の魔女').length,2);
@@ -45,7 +48,7 @@ function assertWebP(file) {
 }
 
 test('all gameplay card art uses non-placeholder WebP assets', () => {
-  const files=[...new Set(['madoka','mami'].flatMap(id=>createDeck(id).map(c=>c.image.split('?')[0])))];
+  const files=[...new Set(['madoka','mami'].flatMap(id=>createDeck(id).filter(c=>c.image).map(c=>c.image.split('?')[0])))];
   assert.equal(files.length,26);
   for(const file of files) assertWebP(file);
 
@@ -69,10 +72,9 @@ test('300 seeded random and tactical duels finish legally without card loss or d
       assert.equal(observation.length,OBSERVATION_SIZE); assert.ok(observation.every(v=>v>=0&&v<=1));
       const action=game%3===0||player===0?legal[Math.floor(rng()*legal.length)]:chooseBaselineAction(a);
       a.applyAction(action);
-      e.state.players.forEach((p,i)=>{
-        const cards=[...p.deck,...p.hand,...p.graveyard,...p.field.filter(Boolean),...e.state.chain.filter(c=>c.player===i).map(c=>c.card)];
-        assert.equal(cards.length,30,`card conservation game ${game}`); assert.equal(new Set(cards.map(c=>c.id)).size,30);
-      });
+      const cards=e.state.players.flatMap(p=>[...p.deck,...p.hand,...p.graveyard,...p.field.filter(Boolean)]).concat(e.state.chain.map(c=>c.card));
+      assert.equal(cards.length,80,`card conservation game ${game}`); assert.equal(new Set(cards.map(c=>c.id)).size,80);
+      for (const owner of [0,1]) assert.equal(cards.filter(c=>c.ownerPlayer===owner).length,40);
     }
     assert.equal(e.player(1-e.state.winner).deck.length,0);
   }

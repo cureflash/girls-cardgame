@@ -45,6 +45,23 @@ test('strategic candidate reduction keeps only legal concrete actions', () => {
   assert.equal(new Set(candidates.map(candidate => candidate.action)).size, candidates.length);
 });
 
+test('determinization keeps original ownership after control exchange', () => {
+  const adapter = createMatch(4242, false), e = adapter.engine;
+  for (const player of [0, 1]) {
+    const index = e.player(player).deck.findIndex(c => c.type === 'familiar');
+    const [card] = e.player(player).deck.splice(index, 1);
+    e.player(1 - player).field[0] = card;
+  }
+  for (const perspective of [0, 1]) {
+    const sampled = determinizeForPlayer(adapter, perspective, seededRng(3));
+    for (const player of [0, 1]) {
+      assert.equal(sampled.engine.player(player).field[0].ownerPlayer, 1 - player);
+      assert.equal(sampled.engine.player(player).deck.length, e.player(player).deck.length);
+      assert.ok(sampled.engine.player(player).deck.every(c => c.ownerPlayer === player));
+    }
+  }
+});
+
 test('conservative planner retains baseline and can refuse noisy deviations', () => {
   const adapter = createMatch(2026, false);
   const player = adapter.currentPlayer();

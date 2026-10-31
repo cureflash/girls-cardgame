@@ -271,7 +271,7 @@ export class GameEngine extends BaseGameEngine {
     if (!plan) throw new Error('Selected Kyoko tribute combination is invalid.');
 
     const opponentTributeValue = this._effectiveMonsterAttack(d.opponentPlayer, target);
-    opponent.graveyard.push(target);
+    this.sendToGraveyard(target, d.opponentPlayer);
     opponent.field[d.opponentSlot] = null;
     this.emit('opponentTribute', {
       player: playerIndex,
@@ -284,7 +284,7 @@ export class GameEngine extends BaseGameEngine {
     for (const slot of plan.slots) {
       const tribute = p.field[slot];
       if (!tribute || ![CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(tribute.type)) throw new Error('Own field tribute disappeared.');
-      p.graveyard.push(tribute);
+      this.sendToGraveyard(tribute, playerIndex);
       p.field[slot] = null;
     }
     for (const id of plan.handIds) {
@@ -292,7 +292,7 @@ export class GameEngine extends BaseGameEngine {
       const tribute = index >= 0 ? p.hand[index] : null;
       if (!tribute || tribute.type !== CARD_TYPES.FAMILIAR) throw new Error('Own hand tribute disappeared.');
       p.hand.splice(index, 1);
-      p.graveyard.push(tribute);
+      this.sendToGraveyard(tribute, playerIndex);
     }
 
     const witchIndex = p.hand.findIndex(card => card.id === witchId);

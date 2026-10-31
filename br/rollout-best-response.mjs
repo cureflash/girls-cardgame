@@ -31,13 +31,6 @@ function removeKnown(template, knownCards) {
   return remaining;
 }
 
-function chainCardsFor(adapter, playerIndex) {
-  return adapter.engine.state.chain
-    .filter(item => item.player === playerIndex)
-    .map(item => item.card)
-    .filter(Boolean);
-}
-
 /**
  * Randomize only information that the perspective player cannot know:
  * - own future deck order
@@ -51,12 +44,14 @@ export function determinizeForPlayer(adapter, perspective, rng = Math.random) {
   const opponentIndex = sampled.engine.opponent(perspective);
   const opp = sampled.engine.player(opponentIndex);
 
-  const selfTemplate = createDeck(self.character.id);
+  const publicCards = sampled.engine.state.players.flatMap((p, controller) => [
+    ...p.field.filter(Boolean), ...p.graveyard,
+  ].map(card => ({ ...card, ownerPlayer: card.ownerPlayer ?? controller })))
+    .concat(sampled.engine.state.chain.map(item => ({ ...item.card, ownerPlayer: item.card.ownerPlayer ?? item.player })));
+  const selfTemplate = createDeck(self.character.id).map(card => ({ ...card, ownerPlayer: perspective }));
   const selfKnown = [
     ...self.hand,
-    ...self.field.filter(Boolean),
-    ...self.graveyard,
-    ...chainCardsFor(sampled, perspective),
+    ...publicCards.filter(card => card.ownerPlayer === perspective),
   ];
   const selfUnseen = removeKnown(selfTemplate, selfKnown);
   if (selfUnseen.length !== self.deck.length) {
@@ -64,12 +59,8 @@ export function determinizeForPlayer(adapter, perspective, rng = Math.random) {
   }
   self.deck = shuffle(selfUnseen, rng).map(card => ({ ...card }));
 
-  const oppTemplate = createDeck(opp.character.id);
-  const oppPublic = [
-    ...opp.field.filter(Boolean),
-    ...opp.graveyard,
-    ...chainCardsFor(sampled, opponentIndex),
-  ];
+  const oppTemplate = createDeck(opp.character.id).map(card => ({ ...card, ownerPlayer: opponentIndex }));
+  const oppPublic = publicCards.filter(card => card.ownerPlayer === opponentIndex);
   const oppUnseen = shuffle(removeKnown(oppTemplate, oppPublic), rng);
   const hiddenCount = opp.hand.length + opp.deck.length;
   if (oppUnseen.length !== hiddenCount) {
@@ -90,6 +81,10 @@ function decodeAction(adapter, action, playerIndex) {
   if (action === ACTIONS.ENTER_BATTLE) return { kind: 'enter-battle', label: 'enter-battle' };
   if (action === ACTIONS.CONTINUE_BATTLE) return { kind: 'continue-battle', label: 'continue-battle' };
   if (action === ACTIONS.SPECIAL) return { kind: 'special', label: `special:${p.character?.id ?? 'unknown'}` };
+  if (adapter.engine.state.pendingDecision?.type === 'CARD_CHOICE') {
+    const d = adapter.engine.state.pendingDecision, option = d.options[action - ACTIONS.CHOICE_BASE];
+    return { kind: 'card-choice', label: `choice:${d.stage}:${option?.key ?? action}` };
+  }
 
   if (action >= ACTIONS.SUMMON_BASE && action < ACTIONS.ATTACK_BASE) {
     const offset = action - ACTIONS.SUMMON_BASE;
@@ -135,9 +130,10 @@ function decodeAction(adapter, action, playerIndex) {
   if (action >= ACTIONS.CHAIN_BASE && action < ACTIONS.REVIVE_BASE) {
     const card = p.hand[action - ACTIONS.CHAIN_BASE];
     if (card?.effect === 'nullifyDamage') return { kind: 'shield', value: 0, label: 'shield' };
-    return { kind: 'boost', value: card?.value ?? 0, label: `boost:${card?.value ?? 0}` };
+    if (card?.effect === 'boost') return { kind: 'boost', value: card.value ?? 0, label: `boost:${card.value ?? 0}` };
+    return { kind: 'extra-chain', label: `chain:${card?.effect}` };
   }
-  if (action >= ACTIONS.REVIVE_BASE && action < ACTIONS.COUNT) {
+  if (action >= ACTIONS.REVIVE_BASE && action < ACTIONS.CHOICE_BASE) {
     const card = p.graveyard[action - ACTIONS.REVIVE_BASE];
     return { kind: 'revive', attack: card?.attack ?? 0, label: `revive:${card?.attack ?? 0}` };
   }
@@ -162,6 +158,7 @@ export function candidateActions(adapter, playerIndex = adapter.currentPlayer())
   }
   for (const value of [2, 3, 5]) add(decoded.find(entry => entry.kind === 'boost' && entry.value === value));
   for (const entry of decoded.filter(entry => entry.kind === 'main-magic')) add(entry);
+  for (const entry of decoded.filter(entry => ['card-choice', 'extra-chain'].includes(entry.kind))) add(entry);
 
   const familiars = decoded.filter(entry => entry.kind === 'summon' && entry.type === CARD_TYPES.FAMILIAR);
   for (const attack of [...new Set(familiars.map(entry => entry.attack))]) add(familiars.find(entry => entry.attack === attack));

@@ -19,6 +19,10 @@ function genomeFor(adapter, player) {
 // Homura uses an OTK-only setup/search policy, and Sayaka/Kyoko use trained evaluation
 // genomes plus character-specific tactics.
 export function chooseBaselineAction(adapter, player = adapter.currentPlayer(), rng = Math.random) {
+  const decision = adapter.engine.state.pendingDecision;
+  if (decision?.type === 'CARD_CHOICE' || (decision?.type === 'CHAIN_RESPONSE' && !adapter.engine.state.battle)) {
+    return chooseEvaluationAction(adapter, player, genomeFor(adapter, player), rng);
+  }
   const nagisaAction = chooseNagisaAction(adapter, player, rng);
   if (nagisaAction !== null) return nagisaAction;
   const homuraAction = chooseHomuraAction(adapter, player, rng);

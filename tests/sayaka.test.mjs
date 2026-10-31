@@ -28,13 +28,15 @@ function mechanicalDeck(character) {
   }));
 }
 
-test('Madoka, Mami, and Sayaka decks have identical mechanical contents', () => {
+test('the original thirty cards remain shared, while only Madoka and Mami get additions', () => {
   const madoka = mechanicalDeck('madoka');
   const mami = mechanicalDeck('mami');
   const sayaka = mechanicalDeck('sayaka');
-  assert.equal(madoka.length, 30);
-  assert.deepEqual(mami, madoka);
-  assert.deepEqual(sayaka, madoka);
+  assert.equal(madoka.length, 40);
+  assert.equal(mami.length, 40);
+  assert.equal(sayaka.length, 30);
+  assert.deepEqual(mami.slice(0, 30), madoka.slice(0, 30));
+  assert.deepEqual(sayaka, madoka.slice(0, 30));
 });
 
 test('Sayaka passive reduces the effective witch tribute requirement by three without changing card stats', () => {

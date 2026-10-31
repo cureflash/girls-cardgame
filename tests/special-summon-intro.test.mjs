@@ -113,7 +113,7 @@ test('obsolete intro controllers and timer monkeypatch are removed', () => {
   const app = readFileSync(`${root}/src/app.js`, 'utf8');
   const intro = readFileSync(`${root}/src/special-summon-intro.js`, 'utf8');
 
-  assert.match(index, /app\.js\?v=homura7/);
+  assert.match(index, /app\.js\?v=cards40/);
   assert.match(index, /special-summon-intro\.js\?v=special-intro7/);
   assert.doesNotMatch(index, /special-intro-screen\.js/);
   assert.doesNotMatch(index, /special-intro-sequence\.js/);

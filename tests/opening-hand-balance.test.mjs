@@ -23,7 +23,7 @@ test('current opening-hand skills are applied exactly', () => {
   for (const [id, handSize] of Object.entries(expected)) {
     const engine = start(id);
     assert.equal(engine.player(0).hand.length, handSize, `${id} opening hand`);
-    assert.equal(engine.player(0).deck.length, 30 - handSize, `${id} remaining deck`);
+    assert.equal(engine.player(0).deck.length, createDeck(id).length - handSize, `${id} remaining deck`);
     const drawEvent = engine.state.events.find(event => event.type === 'draw' && event.player === 0);
     assert.equal(drawEvent?.count, handSize, `${id} initial draw event`);
   }

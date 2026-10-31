@@ -1,4 +1,5 @@
 import { CARD_TYPES } from './game-engine.js';
+import { EXTRA_CARDS, EXTRA_DECKS } from './card-effects.js';
 
 export const CHARACTERS = {
   madoka: { id: 'madoka', name: '鹿目まどか', passive: '戦闘ダメージを1軽減', openingHandModifier: 0, special: 'プルウィア☆マギカ', image: './assets/characters/madoka.webp' },
@@ -69,7 +70,11 @@ export function createDeck(characterId, skinId = characterId, idPrefix = charact
   const magic = (effect, name, value, file, copies, chainable) => add(`magic-${effect}-${value}`, { name, type: CARD_TYPES.MAGIC, effect, value, chainable, image: `./assets/cards/madoka/magic_${file}.webp?v=cards-webp1` }, copies);
   for (const [value, copies] of [[2, 3], [3, 3], [5, 1]]) magic('boost', `攻撃力＋${value}`, value, `attack_up_${value}`, copies, true);
   magic('nullifyDamage', '盾', 0, 'shield', 3, true);
-  return cards; // 30 = familiars 13 + witches 7 + magic 10
+  for (const [effect, copies] of EXTRA_DECKS[characterId] ?? []) {
+    const data = EXTRA_CARDS[effect];
+    add(`extra-${effect}`, { ...data, effect, type: CARD_TYPES.MAGIC, chainable: ['evacuation', 'jammer'].includes(effect) }, copies);
+  }
+  return cards; // Madoka/Mami: 40; other characters: original 30.
 }
 
 export const createPlayerDeck = characterId => createDeck(characterId, 'madoka', `player-${characterId}`);

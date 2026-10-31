@@ -1,17 +1,19 @@
 import { CARD_TYPES, PHASES } from './game-engine.js';
+import { EXTRA_CARDS } from './card-effects.js';
 
 export const RL_LIMITS = Object.freeze({
-  MAX_HAND: 30,
+  MAX_HAND: 40,
   FIELD_SLOTS: 5,
-  MAX_GRAVE: 30,
-  MAX_CHAIN: 30,
+  MAX_GRAVE: 40,
+  MAX_CHAIN: 40,
+  MAX_CHOICES: 80,
   TRIBUTE_MASKS: 32,
 });
 
 const SUMMON_COUNT = RL_LIMITS.MAX_HAND * RL_LIMITS.TRIBUTE_MASKS;
 export const ATTACK_TARGETS = RL_LIMITS.FIELD_SLOTS + 1; // target 5 means direct attack
 const ATTACK_COUNT = RL_LIMITS.FIELD_SLOTS * ATTACK_TARGETS;
-export const RULES_VERSION = '2026-09-13-confirmed-v1';
+export const RULES_VERSION = '2026-11-01-forty-card-effects-v1';
 
 export const ACTIONS = Object.freeze({
   PASS: 0,
@@ -24,17 +26,20 @@ export const ACTIONS = Object.freeze({
   MAIN_MAGIC_BASE: 5 + SUMMON_COUNT + ATTACK_COUNT,
   CHAIN_BASE: 5 + SUMMON_COUNT + ATTACK_COUNT + RL_LIMITS.MAX_HAND,
   REVIVE_BASE: 5 + SUMMON_COUNT + ATTACK_COUNT + RL_LIMITS.MAX_HAND * 2,
-  COUNT: 5 + SUMMON_COUNT + ATTACK_COUNT + RL_LIMITS.MAX_HAND * 3,
+  CHOICE_BASE: 5 + SUMMON_COUNT + ATTACK_COUNT + RL_LIMITS.MAX_HAND * 3,
+  COUNT: 5 + SUMMON_COUNT + ATTACK_COUNT + RL_LIMITS.MAX_HAND * 3 + RL_LIMITS.MAX_CHOICES,
 });
 
-const CARD_FEATURES = 11;
-const CHAIN_FEATURES = 5;
-const GLOBAL_FEATURES = 44;
+const EFFECTS = Object.keys(EXTRA_CARDS);
+const CARD_FEATURES = 12 + EFFECTS.length;
+const CHAIN_FEATURES = 7 + EFFECTS.length;
+const GLOBAL_FEATURES = 51;
 export const OBSERVATION_SIZE = GLOBAL_FEATURES
   + RL_LIMITS.MAX_HAND * CARD_FEATURES
   + RL_LIMITS.FIELD_SLOTS * CARD_FEATURES * 2
   + RL_LIMITS.MAX_GRAVE * CARD_FEATURES * 2
-  + RL_LIMITS.MAX_CHAIN * CHAIN_FEATURES;
+  + RL_LIMITS.MAX_CHAIN * CHAIN_FEATURES
+  + RL_LIMITS.MAX_CHOICES * (CARD_FEATURES + 2);
 
 const clamp01 = (x) => Math.max(0, Math.min(1, Number.isFinite(x) ? x : 0));
 const norm = (x, d) => clamp01((x ?? 0) / d);
@@ -60,6 +65,7 @@ export function encodeAttack(attackerSlot, targetSlot = null) {
 export function encodeMainMagic(handIndex) { return ACTIONS.MAIN_MAGIC_BASE + handIndex; }
 export function encodeChain(handIndex) { return ACTIONS.CHAIN_BASE + handIndex; }
 export function encodeRevive(graveIndex) { return ACTIONS.REVIVE_BASE + graveIndex; }
+export function encodeChoice(index) { return ACTIONS.CHOICE_BASE + index; }
 
 function cardFeatures(card) {
   if (!card) return Array(CARD_FEATURES).fill(0);
@@ -75,6 +81,8 @@ function cardFeatures(card) {
     card.effect === 'boost' ? 1 : 0,
     card.effect === 'nullifyDamage' ? 1 : 0,
     norm(card.rank, 13),
+    card.kind === 'trap' ? 1 : 0,
+    ...EFFECTS.map(effect => Number(card.effect === effect)),
   ];
 }
 
@@ -90,6 +98,9 @@ function chainFeatures(item, playerIndex) {
     item.card?.effect === 'boost' ? 1 : 0,
     item.card?.effect === 'nullifyDamage' ? 1 : 0,
     norm(item.card?.value, 13),
+    Number(!!item.negated),
+    Number(item.card?.kind === 'trap'),
+    ...EFFECTS.map(effect => Number(item.card?.effect === effect)),
   ];
 }
 
@@ -141,12 +152,12 @@ export class RLAdapter {
       pending === null ? 1 : 0,
       pending === 'CHAIN_RESPONSE' ? 1 : 0,
       pending === 'MADOKA_REVIVE' ? 1 : 0,
-      norm(self.deck.length, 30),
-      norm(opp.deck.length, 30),
-      norm(self.hand.length, 30),
-      norm(opp.hand.length, 30),
-      norm(self.graveyard.length, 30),
-      norm(opp.graveyard.length, 30),
+      norm(self.deck.length, 40),
+      norm(opp.deck.length, 40),
+      norm(self.hand.length, 40),
+      norm(opp.hand.length, 40),
+      norm(self.graveyard.length, 40),
+      norm(opp.graveyard.length, 40),
       self.character?.id === 'madoka' ? 1 : 0,
       self.character?.id === 'mami' ? 1 : 0,
       opp.character?.id === 'madoka' ? 1 : 0,
@@ -163,6 +174,11 @@ export class RLAdapter {
       battle?.direct ? 1 : 0, norm(s.chainPassCount, 2),
       norm(battle ? battle.attackerSlot + 1 : 0, 6),
       norm(battle && !battle.direct ? battle.defenderSlot + 1 : 0, 6),
+      Number(pending === 'CARD_CHOICE'),
+      norm(['discard', 'field', 'grave', 'recycle', 'hand', 'swap-own', 'swap-opponent'].indexOf(s.pendingDecision?.stage) + 1, 7),
+      Number(!!s.pendingDecision?.allowDone),
+      norm(self.summonLimit ?? 1, 2), norm(this.engine.summonsUsed(playerIndex), 2),
+      norm(opp.summonLimit ?? 1, 2), norm(this.engine.summonsUsed(this.engine.opponent(playerIndex)), 2),
     ];
 
     appendCards(out, self.hand, RL_LIMITS.MAX_HAND);
@@ -171,6 +187,11 @@ export class RLAdapter {
     appendCards(out, self.graveyard, RL_LIMITS.MAX_GRAVE);
     appendCards(out, opp.graveyard, RL_LIMITS.MAX_GRAVE);
     for (let i = 0; i < RL_LIMITS.MAX_CHAIN; i++) out.push(...chainFeatures(s.chain[i] ?? null, playerIndex));
+    const choices = pending === 'CARD_CHOICE' && s.pendingDecision.player === playerIndex ? s.pendingDecision.options : [];
+    for (let i = 0; i < RL_LIMITS.MAX_CHOICES; i++) {
+      const choice = choices[i];
+      out.push(...cardFeatures(choice?.card), Number(choice?.player === playerIndex), choice ? ({ hand: 1, field: 2, graveyard: 3 }[choice.zone] ?? 0) / 3 : 0);
+    }
 
     if (out.length !== OBSERVATION_SIZE) throw new Error(`Observation size mismatch: ${out.length}`);
     return out;
@@ -184,6 +205,10 @@ export class RLAdapter {
     if (d) {
       if (d.player !== playerIndex) return [];
       const p = this.engine.player(playerIndex);
+      if (d.type === 'CARD_CHOICE') return [
+        ...(d.allowDone ? [ACTIONS.PASS] : []),
+        ...d.options.slice(0, RL_LIMITS.MAX_CHOICES).map((_, i) => encodeChoice(i)),
+      ];
       if (d.type === 'CHAIN_RESPONSE') {
         const actions = [ACTIONS.PASS];
         for (const id of d.options) {
@@ -249,6 +274,12 @@ export class RLAdapter {
     const s = this.engine.state;
     const d = s.pendingDecision;
     this.stats.actions += 1;
+
+    if (d?.type === 'CARD_CHOICE') {
+      this.engine.selectCardChoice(playerIndex, action === ACTIONS.PASS ? null : d.options[action - ACTIONS.CHOICE_BASE].key);
+      this._afterAction();
+      return;
+    }
 
     if (d?.type === 'CHAIN_RESPONSE') {
       if (action === ACTIONS.PASS) {

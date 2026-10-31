@@ -1,22 +1,23 @@
-import { GameEngine, CARD_TYPES, PHASES } from './character-engine.js?v=homura6';
+import { GameEngine, CARD_TYPES, PHASES } from './character-engine.js?v=cards40';
 import { CHARACTERS, createPlayerDeck, createNpcDeck } from './card-data.js';
 import { cardLore } from './card-lore.js';
-import { CharacterAdapter } from './character-adapter.js?v=nagisa2';
+import { CharacterAdapter } from './character-adapter.js?v=cards40';
 import { RULES_VERSION } from './rl-adapter.js';
 import { chooseBaselineAction } from './baseline-ai.js';
 import { Policy } from './policy.js';
-import { buildDuelLog, captureDuelState, createDuelTrace, recordDuelStep } from './duel-log.js?v=duel-log1';
+import { buildDuelLog, captureDuelState, createDuelTrace, recordDuelStep } from './duel-log.js?v=cards40';
 
 const $ = selector => document.querySelector(selector);
 let engine, adapter, duelTrace, human = 0, mode = 'cpu', policy = null, timer, generation = 0, eventCursor = 0;
 let selection = null, tributes = [], attacker = null, target = null;
 const node = (tag, className, text) => { const el = document.createElement(tag); el.className = className; if (text !== undefined) el.textContent = text; return el; };
-const typeName = card => ({ familiar: '使い魔', witch: '魔女', magic: '魔法' })[card.type];
+const typeName = card => card.kind === 'trap' ? '罠' : ({ familiar: '使い魔', witch: '魔女', magic: '魔法' })[card.type];
 
 function description(card) {
+  if (card.description) return card.description;
   if (card.type === CARD_TYPES.WITCH) return `攻撃力 ${card.attack}。場の使い魔・魔女と手札の使い魔を生贄にし、攻撃力合計 ${card.tributeThreshold} 以上で召喚。`;
   if (card.type === CARD_TYPES.FAMILIAR) return `攻撃力 ${card.attack}。生贄なしで召喚できます。`;
-  if (card.effect === 'draw') return 'メインフェイズに2枚ドロー。山札が0枚になると敗北します。';
+  if (card.effect === 'draw') return 'メインフェイズに2枚ドロー。ドローで山札が0枚になっても、その時点では敗北しません。';
   if (card.effect === 'boost') return `戦闘中の自分の使い魔・魔女の攻撃力を＋${card.value}。この戦闘のみ有効。`;
   return 'この戦闘では双方の使い魔・魔女は戦闘では破壊されず、自分が受ける戦闘ダメージは0になります。発動した時点でチェーンを終了し、この戦闘の解決後にバトルフェイズを終了します。';
 }
@@ -32,8 +33,8 @@ function controllerFor(playerIndex) {
 function showDetail(card) {
   const root = $('#card-detail');
   root.replaceChildren();
-  const img = node('img', 'detail-image'); img.src = card.image; img.alt = card.name;
-  root.append(img, node('small', 'card-type', typeName(card)), node('h3', '', card.name), node('p', '', cardLore(card) ?? description(card)));
+  if (card.image) { const img = node('img', 'detail-image'); img.src = card.image; img.alt = card.name; root.append(img); }
+  root.append(node('small', 'card-type', typeName(card)), node('h3', '', card.name), node('p', '', cardLore(card) ?? description(card)));
 }
 function tributeRequirement(playerIndex, card) {
   if (card?.type !== CARD_TYPES.WITCH) return 0;
@@ -160,11 +161,15 @@ function cardButton(card, owner, zone, slot) {
   const b = node('button', `card ${card.type}`);
   b.dataset.cardId = card.id;
   b.setAttribute('aria-label', `${card.name}、${description(card)}`);
-  const visual = node('div', 'card-visual'), img = node('img', 'card-image');
-  img.src = card.image; img.alt = ''; img.draggable = false;
-  visual.append(img);
+  const visual = node('div', 'card-visual');
+  if (card.image) {
+    const img = node('img', 'card-image'); img.src = card.image; img.alt = ''; img.draggable = false; visual.append(img);
+  } else {
+    visual.classList.add('text-card', card.kind === 'trap' ? 'trap-art' : 'spell-art');
+    visual.append(node('small', '', typeName(card)), node('strong', '', card.name), node('span', '', card.badge));
+  }
   const caption = node('div', 'card-caption');
-  caption.append(node('span', 'card-name', card.name), node('b', 'card-value', card.attack ? `ATK ${card.attack}` : card.effect === 'boost' ? `＋${card.value}` : card.effect === 'draw' ? '2枚ドロー' : '破壊無効'));
+  caption.append(node('span', 'card-name', card.name), node('b', 'card-value', card.attack ? `ATK ${card.attack}` : card.effect === 'boost' ? `＋${card.value}` : card.effect === 'draw' ? '2枚ドロー' : card.badge ?? '破壊無効'));
   b.append(visual, caption);
   const selected = zone === 'hand' ? selection?.owner === owner && selection?.id === card.id : attacker?.owner === owner && attacker.slot === slot;
   const asTribute = zone === 'field'
@@ -235,7 +240,7 @@ function renderPlayer(index, selector) {
     const info = node('div', 'hand-heading');
     info.append(
       node('b', '', '手札'),
-      node('span', '', p.summonedThisTurn && index === s.activePlayer ? 'このターンの召喚は使用済み' : '召喚は1ターンに1体'),
+      node('span', '', `通常召喚：残り${engine.remainingSummons(index)}回 / 上限${p.summonLimit ?? 1}回`),
       node('span', '', `必殺技：${p.specialUsed ? '使用済み' : '未使用'}`),
     );
     const hand = node('div', 'hand'); p.hand.forEach(card => hand.append(cardButton(card, index, 'hand')));
@@ -252,7 +257,7 @@ function renderActions() {
   else if (s.pendingDecision) hint = '必殺技・チェーンの選択を完了してください。';
   else {
     if (s.phase === PHASES.MAIN) {
-      hint = engine.player(p).summonedThisTurn ? '召喚済みです。魔法を使うか、バトルへ進めます。' : '光っている手札を選んで召喚・発動できます。';
+      hint = engine.remainingSummons(p) === 0 ? '召喚済みです。魔法を使うか、バトルへ進めます。' : '光っている手札を選んで召喚・発動できます。';
       if (card) {
         hint = `${card.name}：${description(card)}`;
         if (card.type !== CARD_TYPES.MAGIC) {
@@ -265,7 +270,7 @@ function renderActions() {
             () => engine.summon(p, card.id, tributes),
             { type: 'summon', cardId: card.id, cardName: card.name, tributes: structuredClone(tributes) },
           ), 'primary', !engine.canSummon(p, card.id) || !tributeReady));
-        } else if (card.effect === 'draw') root.append(button('魔法を発動', () => perform(
+        } else root.append(button(`${typeName(card)}を発動`, () => perform(
           () => engine.activateMainMagic(p, card.id),
           { type: 'main-magic', cardId: card.id, cardName: card.name },
         ), 'primary', !engine.canActivateMainMagic(p, card.id)));
@@ -317,7 +322,7 @@ function render() {
   const bottom = mode === 'local' ? adapter.currentPlayer() : human;
   renderPlayer(1 - bottom, '#top-player'); renderPlayer(bottom, '#bottom-player');
   for (const el of $('#phases').children) {
-    const active = el.dataset.phase === (s.phase === PHASES.CHAIN ? PHASES.BATTLE : s.phase);
+    const active = el.dataset.phase === (s.phase === PHASES.CHAIN ? s.resumePhase ?? PHASES.BATTLE : s.phase);
     el.classList.toggle('current', active);
     if (active) el.setAttribute('aria-current', 'step'); else el.removeAttribute('aria-current');
   }
@@ -345,18 +350,33 @@ function renderDecision() {
   root.replaceChildren();
 
   if (d.type === 'CHAIN_RESPONSE') {
-    const heading = node('h2', '', '魔法で応じますか？'); heading.id = 'decision-title';
+    const heading = node('h2', '', '魔法・罠で応じますか？'); heading.id = 'decision-title';
     root.append(node('small', 'eyebrow', p.name), heading);
     const b = engine.state.battle;
-    let atk = b.attackerBase + b.attackerBonus, def = b.defenderBase + b.defenderBonus;
+    let atk = b ? b.attackerBase + b.attackerBonus : 0, def = b ? b.defenderBase + b.defenderBonus : 0;
     for (const item of engine.state.chain) if (item.card.effect === 'boost') {
+      if (!b) continue;
       if (b.nagisaForced) atk += item.card.value;
       else if (item.player === b.attackerPlayer) atk += item.card.value;
       else def += item.card.value;
     }
-    root.append(node('p', '', b.direct ? `直接攻撃 · 攻撃力 ${atk}` : `攻撃 ${atk} ／ 防御側の攻撃力 ${def}`), node('p', 'muted', b.nagisaForced ? '強制戦闘ではなぎさだけが攻撃アップ・盾を使用できます。' : '魔法を選んで発動。選ばない場合は「発動しない」。'));
+    root.append(node('p', '', b ? b.direct ? `直接攻撃 · 攻撃力 ${atk}` : `攻撃 ${atk} ／ 防御側の攻撃力 ${def}` : `${engine.state.chain.at(-1)?.card.name ?? '魔法'}の発動に応答`), node('p', 'muted', b?.nagisaForced ? '強制戦闘ではなぎさだけが攻撃アップ・盾を使用できます。' : 'カードを選んで発動。選ばない場合は「発動しない」。'));
     decisionCardList(root, d.options.map(id => p.hand.find(c => c.id === id)), card => perform(() => engine.respondChain(d.player, card.id), { type: 'chain-response', cardId: card.id, cardName: card.name }));
     root.append(button('発動しない', () => perform(() => engine.respondChain(d.player), { type: 'chain-pass' }), 'secondary'));
+  } else if (d.type === 'CARD_CHOICE') {
+    const titles = { discard: 'コストとして捨てる手札を選択', field: '対象の使い魔・魔女を選択', grave: '墓地の使い魔・魔女を選択', recycle: `山札に戻すモンスターを選択（${d.context.targets.length}/5）`, hand: `山札に戻す手札を選択（${d.context.targets.length}枚）`, 'swap-own': '交換に出す自分のモンスターを選択', 'swap-opponent': '交換に出す自分のモンスターを選択' };
+    const heading = node('h2', '', titles[d.stage]); heading.id = 'decision-title';
+    root.append(node('small', 'eyebrow', p.name), heading);
+    if (d.stage.startsWith('swap-')) root.append(node('p', 'muted', '双方が、自分の場から交換に出す1体を選びます。'));
+    const list = node('div', 'modal-cards');
+    for (const option of d.options) {
+      const b = cardButton(option.card, option.player, 'choice', option.slot);
+      b.append(node('span', 'plan-label', engine.player(option.player).name));
+      b.onclick = () => perform(() => engine.selectCardChoice(d.player, option.key), { type: 'card-choice', key: option.key, stage: d.stage, cardId: option.card.id });
+      list.append(b);
+    }
+    root.append(list);
+    if (d.allowDone) root.append(button('選択を完了', () => perform(() => engine.selectCardChoice(d.player), { type: 'card-choice-done' }), 'secondary'));
   } else if (d.type === 'MADOKA_REVIVE') {
     const heading = node('h2', '', '蘇生するカードを選択'); heading.id = 'decision-title';
     root.append(node('small', 'eyebrow', p.name), heading);
