@@ -370,8 +370,15 @@ function renderDecision() {
     decisionCardList(root, d.options.map(id => p.hand.find(c => c.id === id)), card => perform(() => engine.respondChain(d.player, card.id), { type: 'chain-response', cardId: card.id, cardName: card.name }));
     root.append(button('発動しない', () => perform(() => engine.respondChain(d.player), { type: 'chain-pass' }), 'secondary'));
   } else if (d.type === 'CARD_CHOICE') {
-    const titles = { discard: 'コストとして捨てる手札を選択', field: '対象の使い魔・魔女を選択', grave: '墓地の使い魔・魔女を選択', recycle: `山札に戻すモンスターを選択（${d.context.targets.length}/5）`, hand: `山札に戻す手札を選択（${d.context.targets.length}枚）`, 'swap-own': '交換に出す自分のモンスターを選択', 'swap-opponent': '交換に出す自分のモンスターを選択' };
-    const heading = node('h2', '', titles[d.stage]); heading.id = 'decision-title';
+    const titles = {
+      discard: 'コストとして捨てる手札を選択', field: '対象の使い魔・魔女を選択',
+      grave: '墓地の使い魔・魔女を選択', recycle: '山札に戻すモンスターを選択', hand: '山札に戻す手札を選択',
+      'swap-own': '交換に出す自分のモンスターを選択', 'swap-opponent': '交換に出す自分のモンスターを選択',
+    };
+    let title = titles[d.stage];
+    if (d.stage === 'recycle') title += `（${d.context.targets.length}/5）`;
+    else if (d.stage === 'hand') title += `（${d.context.targets.length}枚）`;
+    const heading = node('h2', '', title); heading.id = 'decision-title';
     root.append(node('small', 'eyebrow', p.name), heading);
     if (d.stage.startsWith('swap-')) root.append(node('p', 'muted', '双方が、自分の場から交換に出す1体を選びます。'));
     const list = node('div', 'modal-cards');
