@@ -49,7 +49,7 @@ function assertWebP(file) {
 
 test('all gameplay card art uses non-placeholder WebP assets', () => {
   const files=[...new Set(['madoka','mami'].flatMap(id=>createDeck(id).filter(c=>c.image).map(c=>c.image.split('?')[0])))];
-  assert.equal(files.length,26);
+  assert.equal(files.length,35);
   for(const file of files) assertWebP(file);
 
   const mamiMonsters=createDeck('mami').filter(c=>c.type!=='magic');

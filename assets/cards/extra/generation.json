@@ -1,0 +1,109 @@
+{
+  "generator": "built-in image_gen",
+  "format": "WebP",
+  "dimensions": [
+    512,
+    768
+  ],
+  "cards": [
+    {
+      "effect": "evacuation",
+      "title": "強制脱出装置",
+      "label": "手札へ戻す",
+      "subject": "An ornate miniature golden door abruptly opening inside a floating crystalline rose-pink bubble. A black paper butterfly is gently whisked backwards through the luminous doorway on curling crimson ribbons, suggesting a magical return or escape. Deep violet stained glass and rose thorns behind it. No person, no machinery or science-fiction interface.",
+      "prompt": "Use case: stylized-concept. Asset type: one finished portrait fantasy trading card face for a Madoka Magica fan card game, vertical 2:3 ratio. Create a NEW illustration. Visual direction: antique magical-girl grimoire, sumptuous burgundy and rose-pink velvet, dark plum rose-and-thorn lace filigree, aged ivory rounded outer border, delicate gold jewelry, paper-cut collage and hand-painted etched fantasy details. Elegant, eerie, enchanted, highly legible as a small card. Match the same family across all cards: an ivory outer margin, ornate plum floral corners, short centered Japanese title in a top burgundy plaque, a large central illustration inside a pink glowing magical sphere, and one short centered Japanese effect label on a dusty wine-red brocade footer. Subject occupies middle 60%, centered with clear silhouette. Warm ivory, wine red, magenta highlights and antique gold, with small accents chosen for the subject. Flat frontal printed card, no perspective mockup, no hands holding it, no desktop, no logo, no watermark. No numbers or text other than the exact title and effect label. Typography: title pale ivory with dark outline, footer black readable Japanese. Portrait 2:3. Text (verbatim): title 「強制脱出装置」, footer 「手札へ戻す」. Subject: An ornate miniature golden door abruptly opening inside a floating crystalline rose-pink bubble. A black paper butterfly is gently whisked backwards through the luminous doorway on curling crimson ribbons, suggesting a magical return or escape. Deep violet stained glass and rose thorns behind it. No person, no machinery or science-fiction interface.",
+      "source": "exec-ffa042d4-9663-42ee-9789-8aae5c95d39a.png",
+      "file": "evacuation.webp",
+      "sha256": "726e319e9934cbaaff00773c78125835c0597c43cec3a11f95483e9338d07819",
+      "bytes": 124920
+    },
+    {
+      "effect": "doomed",
+      "title": "死者への手向け",
+      "label": "1枚捨てて1体破壊",
+      "subject": "A single elaborate funeral bouquet of black lilies and crimson roses, tied by a gold-edged wine-red ribbon, hovering above a fractured dark crystal. Petals and tiny paper fragments dissolve into the surrounding pink spell circle. Solemn beautiful magical destruction, no gore, no body.",
+      "prompt": "Use case: stylized-concept. Asset type: one finished portrait fantasy trading card face for a Madoka Magica fan card game, vertical 2:3 ratio. Create a NEW illustration. Visual direction: antique magical-girl grimoire, sumptuous burgundy and rose-pink velvet, dark plum rose-and-thorn lace filigree, aged ivory rounded outer border, delicate gold jewelry, paper-cut collage and hand-painted etched fantasy details. Elegant, eerie, enchanted, highly legible as a small card. Match the same family across all cards: an ivory outer margin, ornate plum floral corners, short centered Japanese title in a top burgundy plaque, a large central illustration inside a pink glowing magical sphere, and one short centered Japanese effect label on a dusty wine-red brocade footer. Subject occupies middle 60%, centered with clear silhouette. Warm ivory, wine red, magenta highlights and antique gold, with small accents chosen for the subject. Flat frontal printed card, no perspective mockup, no hands holding it, no desktop, no logo, no watermark. No numbers or text other than the exact title and effect label. Typography: title pale ivory with dark outline, footer black readable Japanese. Portrait 2:3. Text (verbatim): title 「死者への手向け」, footer 「1枚捨てて1体破壊」. Subject: A single elaborate funeral bouquet of black lilies and crimson roses, tied by a gold-edged wine-red ribbon, hovering above a fractured dark crystal. Petals and tiny paper fragments dissolve into the surrounding pink spell circle. Solemn beautiful magical destruction, no gore, no body.",
+      "source": "exec-4106d1b9-3e81-4ec4-bc33-706160925d9f.png",
+      "file": "doomed.webp",
+      "sha256": "26fbf560c7140e6e0f2ed09a0f523fbd089e3af85a7ec2a557d2a9447b69a8d8",
+      "bytes": 122838
+    },
+    {
+      "effect": "doubleSummon",
+      "title": "二重召喚",
+      "label": "通常召喚を2回に",
+      "subject": "Two distinct golden summoning circles side by side, one luminous pink paper butterfly emerging from each, their rose-colored magical auras joined by an elegant gold infinity ribbon. Balanced pair, twin ornate arch motifs behind them, a clear feeling of invoking twice. No person, no text symbols.",
+      "prompt": "Use case: stylized-concept. Asset type: one finished portrait fantasy trading card face for a Madoka Magica fan card game, vertical 2:3 ratio. Create a NEW illustration. Visual direction: antique magical-girl grimoire, sumptuous burgundy and rose-pink velvet, dark plum rose-and-thorn lace filigree, aged ivory rounded outer border, delicate gold jewelry, paper-cut collage and hand-painted etched fantasy details. Elegant, eerie, enchanted, highly legible as a small card. Match the same family across all cards: an ivory outer margin, ornate plum floral corners, short centered Japanese title in a top burgundy plaque, a large central illustration inside a pink glowing magical sphere, and one short centered Japanese effect label on a dusty wine-red brocade footer. Subject occupies middle 60%, centered with clear silhouette. Warm ivory, wine red, magenta highlights and antique gold, with small accents chosen for the subject. Flat frontal printed card, no perspective mockup, no hands holding it, no desktop, no logo, no watermark. No numbers or text other than the exact title and effect label. Typography: title pale ivory with dark outline, footer black readable Japanese. Portrait 2:3. Text (verbatim): title 「二重召喚」, footer 「通常召喚を2回に」. Subject: Two distinct golden summoning circles side by side, one luminous pink paper butterfly emerging from each, their rose-colored magical auras joined by an elegant gold infinity ribbon. Balanced pair, twin ornate arch motifs behind them, a clear feeling of invoking twice. No person, no text symbols.",
+      "source": "exec-b82982a8-1d54-4287-a31a-6077c813ebe5.png",
+      "file": "doubleSummon.webp",
+      "sha256": "6c29f6b2dff31597501347ced0715ddfac1ae088bf6be29c3cc8b10aab183fef",
+      "bytes": 117334
+    },
+    {
+      "effect": "jammer",
+      "title": "マジック・ジャマー",
+      "label": "魔法の発動を無効",
+      "subject": "An antique black-and-gold jeweled padlock suspended before a cracked luminous magenta spell circle. Two deep plum ribbons cross over the circle and cut a stream of pink magic into sparkling glass shards. A ruby heart-shaped jewel in the lock. Magical suppression, elegant gothic filigree, no person.",
+      "prompt": "Use case: stylized-concept. Asset type: one finished portrait fantasy trading card face for a Madoka Magica fan card game, vertical 2:3 ratio. Create a NEW illustration. Visual direction: antique magical-girl grimoire, sumptuous burgundy and rose-pink velvet, dark plum rose-and-thorn lace filigree, aged ivory rounded outer border, delicate gold jewelry, paper-cut collage and hand-painted etched fantasy details. Elegant, eerie, enchanted, highly legible as a small card. Match the same family across all cards: an ivory outer margin, ornate plum floral corners, short centered Japanese title in a top burgundy plaque, a large central illustration inside a pink glowing magical sphere, and one short centered Japanese effect label on a dusty wine-red brocade footer. Subject occupies middle 60%, centered with clear silhouette. Warm ivory, wine red, magenta highlights and antique gold, with small accents chosen for the subject. Flat frontal printed card, no perspective mockup, no hands holding it, no desktop, no logo, no watermark. No numbers or text other than the exact title and effect label. Typography: title pale ivory with dark outline, footer black readable Japanese. Portrait 2:3. Text (verbatim): title 「マジック・ジャマー」, footer 「魔法の発動を無効」. Subject: An antique black-and-gold jeweled padlock suspended before a cracked luminous magenta spell circle. Two deep plum ribbons cross over the circle and cut a stream of pink magic into sparkling glass shards. A ruby heart-shaped jewel in the lock. Magical suppression, elegant gothic filigree, no person.",
+      "source": "exec-c96da8fd-6dd5-438d-845d-d0163fe1ff39.png",
+      "file": "jammer.webp",
+      "sha256": "185086b4aec7c8ff765cb426d15cd9cc12e86fa458b8cb785ad9f0ee9da54f89",
+      "bytes": 125460
+    },
+    {
+      "effect": "swap",
+      "title": "強制転移",
+      "label": "1体ずつ交換",
+      "subject": "Two ornate antique gold hand mirrors floating facing one another, one reflecting a pale pink butterfly and the other a dark violet butterfly. Two curved crimson ribbons trace clearly crossing arcs between the mirrors to suggest an exchange of their spirits. A rose-pink magic sphere embraces both mirrors, no people.",
+      "prompt": "Use case: stylized-concept. Asset type: one finished portrait fantasy trading card face for a Madoka Magica fan card game, vertical 2:3 ratio. Create a NEW illustration. Visual direction: antique magical-girl grimoire, sumptuous burgundy and rose-pink velvet, dark plum rose-and-thorn lace filigree, aged ivory rounded outer border, delicate gold jewelry, paper-cut collage and hand-painted etched fantasy details. Elegant, eerie, enchanted, highly legible as a small card. Match the same family across all cards: an ivory outer margin, ornate plum floral corners, short centered Japanese title in a top burgundy plaque, a large central illustration inside a pink glowing magical sphere, and one short centered Japanese effect label on a dusty wine-red brocade footer. Subject occupies middle 60%, centered with clear silhouette. Warm ivory, wine red, magenta highlights and antique gold, with small accents chosen for the subject. Flat frontal printed card, no perspective mockup, no hands holding it, no desktop, no logo, no watermark. No numbers or text other than the exact title and effect label. Typography: title pale ivory with dark outline, footer black readable Japanese. Portrait 2:3. Text (verbatim): title 「強制転移」, footer 「1体ずつ交換」. Subject: Two ornate antique gold hand mirrors floating facing one another, one reflecting a pale pink butterfly and the other a dark violet butterfly. Two curved crimson ribbons trace clearly crossing arcs between the mirrors to suggest an exchange of their spirits. A rose-pink magic sphere embraces both mirrors, no people.",
+      "source": "exec-0a334e0d-38d6-4f67-9780-ad87dfdfbcae.png",
+      "file": "swap.webp",
+      "sha256": "33508a101b532ec9abed7e4a579b2d3ad4d84a770ac244f01ba2b4ca4aeead6e",
+      "bytes": 113468
+    },
+    {
+      "effect": "mallet",
+      "title": "打ち出の小槌",
+      "label": "手札を交換",
+      "subject": "A beautiful small Japanese wish-granting ceremonial mallet of deep crimson lacquer and antique gold, with a long flowing pink silk tassel. A swirl of blank ivory playing cards turns into rose petals and back to new blank cards around its head. Enchanted magical-girl jewelry ornament, no people, no writing on the small cards.",
+      "prompt": "Use case: stylized-concept. Asset type: one finished portrait fantasy trading card face for a Madoka Magica fan card game, vertical 2:3 ratio. Create a NEW illustration. Visual direction: antique magical-girl grimoire, sumptuous burgundy and rose-pink velvet, dark plum rose-and-thorn lace filigree, aged ivory rounded outer border, delicate gold jewelry, paper-cut collage and hand-painted etched fantasy details. Elegant, eerie, enchanted, highly legible as a small card. Match the same family across all cards: an ivory outer margin, ornate plum floral corners, short centered Japanese title in a top burgundy plaque, a large central illustration inside a pink glowing magical sphere, and one short centered Japanese effect label on a dusty wine-red brocade footer. Subject occupies middle 60%, centered with clear silhouette. Warm ivory, wine red, magenta highlights and antique gold, with small accents chosen for the subject. Flat frontal printed card, no perspective mockup, no hands holding it, no desktop, no logo, no watermark. No numbers or text other than the exact title and effect label. Typography: title pale ivory with dark outline, footer black readable Japanese. Portrait 2:3. Text (verbatim): title 「打ち出の小槌」, footer 「手札を交換」. Subject: A beautiful small Japanese wish-granting ceremonial mallet of deep crimson lacquer and antique gold, with a long flowing pink silk tassel. A swirl of blank ivory playing cards turns into rose petals and back to new blank cards around its head. Enchanted magical-girl jewelry ornament, no people, no writing on the small cards.",
+      "source": "exec-24c70ee4-83d2-4d6d-ac8c-c87e815d5b2a.png",
+      "file": "mallet.webp",
+      "sha256": "899f4b07992d75dd8ac103f807f260b762382b569ad883c3b83f868a75fc7125",
+      "bytes": 114624
+    },
+    {
+      "effect": "reincarnate",
+      "title": "死者転生",
+      "label": "墓地から手札へ",
+      "subject": "An open antique ivory spellbook with black rose clasps and aged gold corners, floating in a dim gothic garden. A single delicate violet butterfly made of light is lifted from between its pages on a pink ribbon, as if recovering a lost memory into a cherished book. Pale small stars and scattered petals inside a rose-colored sphere. No people, no readable writing on pages.",
+      "prompt": "Use case: stylized-concept. Asset type: one finished portrait fantasy trading card face for a Madoka Magica fan card game, vertical 2:3 ratio. Create a NEW illustration. Visual direction: antique magical-girl grimoire, sumptuous burgundy and rose-pink velvet, dark plum rose-and-thorn lace filigree, aged ivory rounded outer border, delicate gold jewelry, paper-cut collage and hand-painted etched fantasy details. Elegant, eerie, enchanted, highly legible as a small card. Match the same family across all cards: an ivory outer margin, ornate plum floral corners, short centered Japanese title in a top burgundy plaque, a large central illustration inside a pink glowing magical sphere, and one short centered Japanese effect label on a dusty wine-red brocade footer. Subject occupies middle 60%, centered with clear silhouette. Warm ivory, wine red, magenta highlights and antique gold, with small accents chosen for the subject. Flat frontal printed card, no perspective mockup, no hands holding it, no desktop, no logo, no watermark. No numbers or text other than the exact title and effect label. Typography: title pale ivory with dark outline, footer black readable Japanese. Portrait 2:3. Text (verbatim): title 「死者転生」, footer 「墓地から手札へ」. Subject: An open antique ivory spellbook with black rose clasps and aged gold corners, floating in a dim gothic garden. A single delicate violet butterfly made of light is lifted from between its pages on a pink ribbon, as if recovering a lost memory into a cherished book. Pale small stars and scattered petals inside a rose-colored sphere. No people, no readable writing on pages.",
+      "source": "exec-5ab81f99-e411-4f83-8885-ce912f0c3102.png",
+      "file": "reincarnate.webp",
+      "sha256": "0b5ac986179dbc55e8d493ce0b04d293d5731ba752628bd6f3ec9e7d082b2df9",
+      "bytes": 113374
+    },
+    {
+      "effect": "reborn",
+      "title": "死者蘇生",
+      "label": "墓地から1体蘇生",
+      "subject": "A luminous rose-pink soul gem held in an ornate golden locket rising from black rose ashes. A radiant white-and-pink butterfly unfolds above it, with fine golden particles and pale rose petals streaming upwards through a circular magical halo. A clear hopeful resurrection, strong upward movement. No people, no crosses or tombstone lettering.",
+      "prompt": "Use case: stylized-concept. Asset type: one finished portrait fantasy trading card face for a Madoka Magica fan card game, vertical 2:3 ratio. Create a NEW illustration. Visual direction: antique magical-girl grimoire, sumptuous burgundy and rose-pink velvet, dark plum rose-and-thorn lace filigree, aged ivory rounded outer border, delicate gold jewelry, paper-cut collage and hand-painted etched fantasy details. Elegant, eerie, enchanted, highly legible as a small card. Match the same family across all cards: an ivory outer margin, ornate plum floral corners, short centered Japanese title in a top burgundy plaque, a large central illustration inside a pink glowing magical sphere, and one short centered Japanese effect label on a dusty wine-red brocade footer. Subject occupies middle 60%, centered with clear silhouette. Warm ivory, wine red, magenta highlights and antique gold, with small accents chosen for the subject. Flat frontal printed card, no perspective mockup, no hands holding it, no desktop, no logo, no watermark. No numbers or text other than the exact title and effect label. Typography: title pale ivory with dark outline, footer black readable Japanese. Portrait 2:3. Text (verbatim): title 「死者蘇生」, footer 「墓地から1体蘇生」. Subject: A luminous rose-pink soul gem held in an ornate golden locket rising from black rose ashes. A radiant white-and-pink butterfly unfolds above it, with fine golden particles and pale rose petals streaming upwards through a circular magical halo. A clear hopeful resurrection, strong upward movement. No people, no crosses or tombstone lettering.",
+      "source": "exec-68e4f863-bffc-4bbe-9b17-b83c94942a6b.png",
+      "file": "reborn.webp",
+      "sha256": "826019241807e335b8cba957f0df94ce6406491aee7463c047b954acebb15288",
+      "bytes": 102152
+    },
+    {
+      "effect": "avarice",
+      "title": "貪欲な壺",
+      "label": "5体戻して2枚引く",
+      "subject": "An extravagant rounded antique black ceramic urn with elaborate gold filigree, plum rose carvings and a ruby heart-shaped jewel. Five small violet butterfly spirits curl into its glowing mouth, while two blank ivory cards spiral out on crimson ribbons. An original elegant witch's treasure vessel, not a cartoon face, not the Yu-Gi-Oh pot illustration. Rose-pink magical sphere, no people, no text on the small cards.",
+      "prompt": "Use case: stylized-concept. Asset type: one finished portrait fantasy trading card face for a Madoka Magica fan card game, vertical 2:3 ratio. Create a NEW illustration. Visual direction: antique magical-girl grimoire, sumptuous burgundy and rose-pink velvet, dark plum rose-and-thorn lace filigree, aged ivory rounded outer border, delicate gold jewelry, paper-cut collage and hand-painted etched fantasy details. Elegant, eerie, enchanted, highly legible as a small card. Match the same family across all cards: an ivory outer margin, ornate plum floral corners, short centered Japanese title in a top burgundy plaque, a large central illustration inside a pink glowing magical sphere, and one short centered Japanese effect label on a dusty wine-red brocade footer. Subject occupies middle 60%, centered with clear silhouette. Warm ivory, wine red, magenta highlights and antique gold, with small accents chosen for the subject. Flat frontal printed card, no perspective mockup, no hands holding it, no desktop, no logo, no watermark. No numbers or text other than the exact title and effect label. Typography: title pale ivory with dark outline, footer black readable Japanese. Portrait 2:3. Text (verbatim): title 「貪欲な壺」, footer 「5体戻して2枚引く」. Subject: An extravagant rounded antique black ceramic urn with elaborate gold filigree, plum rose carvings and a ruby heart-shaped jewel. Five small violet butterfly spirits curl into its glowing mouth, while two blank ivory cards spiral out on crimson ribbons. An original elegant witch's treasure vessel, not a cartoon face, not the Yu-Gi-Oh pot illustration. Rose-pink magical sphere, no people, no text on the small cards.",
+      "source": "exec-9bded752-19b0-404d-8ba7-de1fdf7d09cf.png",
+      "file": "avarice.webp",
+      "sha256": "b70c73fbf43a49f35edd4429569e88eab6bd77fc78812cd6fe7a4919dc8f9156",
+      "bytes": 121550
+    }
+  ]
+}
