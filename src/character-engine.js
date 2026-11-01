@@ -29,7 +29,7 @@ export class GameEngine extends NagisaGameEngine {
       && player.nagisaFamiliarReturnTurn !== this.state.turn
     ) {
       player.field[slot] = null;
-      player.hand.push(card);
+      this.player(this.cardOwner(card, playerIndex)).hand.push(card);
       player.nagisaFamiliarReturnTurn = this.state.turn;
       this.emit('destroy', {
         player: playerIndex,
@@ -39,7 +39,7 @@ export class GameEngine extends NagisaGameEngine {
         replacement: 'nagisa-familiar-return',
       });
       this.emit('returnToHand', {
-        player: playerIndex,
+        player: this.cardOwner(card, playerIndex),
         card: { ...card },
         reason: 'nagisa-passive',
       });

@@ -1,0 +1,78 @@
+{
+  "rulesVersion": "2026-11-01-forty-card-effects-v1",
+  "characters": [
+    "madoka",
+    "mami"
+  ],
+  "architecture": [
+    96,
+    96
+  ],
+  "selectedCandidate": "ppo-03.zip",
+  "selectedPpoSteps": 98304,
+  "completedPpoSteps": 131072,
+  "warmupDecisions": 12000,
+  "refinementExpertDecisions": 32000,
+  "selectionRule": "validation win rate minus truncated fraction; held-out games are reporting only",
+  "validationBaseline": {
+    "games": 48,
+    "wins": 14,
+    "losses": 34,
+    "truncated": 0,
+    "byCharacter": {
+      "madoka": [
+        7,
+        16
+      ],
+      "mami": [
+        7,
+        18
+      ]
+    },
+    "winRate": 0.2916666666666667
+  },
+  "heldOutBaseline": {
+    "games": 100,
+    "wins": 26,
+    "losses": 74,
+    "truncated": 0,
+    "byCharacter": {
+      "madoka": [
+        13,
+        48
+      ],
+      "mami": [
+        13,
+        26
+      ]
+    },
+    "winRate": 0.26
+  },
+  "heldOutRandom": {
+    "games": 100,
+    "wins": 89,
+    "losses": 10,
+    "truncated": 1,
+    "byCharacter": {
+      "madoka": [
+        50,
+        3
+      ],
+      "mami": [
+        39,
+        7
+      ]
+    },
+    "winRate": 0.898989898989899
+  },
+  "policySha256": "a42668f29b53f53254515b359125d04b262835138dae490a60590be3c51f0554",
+  "checkpointSha256": "5998b631d1f57b8dffabd8db3a4fa902683409a360d3b9db81ea549cf3d909ae",
+  "refinementSourceCheckpoint": "warmup.zip",
+  "refinementSourceSha256": "da2e23a9fa28b519c30876bc7d8d0210c48b697d9b55f1c42c8a0d100008d8d9",
+  "tests": {
+    "nodeTests": 137,
+    "javascriptGames": 40,
+    "javascriptTruncated": 0,
+    "pythonJavascriptParity": 32
+  }
+}

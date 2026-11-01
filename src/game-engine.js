@@ -1,3 +1,5 @@
+import { isExtraCard, canUseExtraCard, beginCardActivation, selectCardChoice, resolveExtraCard } from './card-effects.js';
+
 export const PHASES = Object.freeze({
   MAIN: 'MAIN',
   BATTLE_START: 'BATTLE_START',
@@ -22,6 +24,7 @@ export class GameEngine {
       phase: PHASES.MAIN,
       pendingDecision: null,
       chain: [],
+      nextChainId: 0,
       chainPassCount: 0,
       resumePhase: null,
       battle: null,
@@ -33,11 +36,13 @@ export class GameEngine {
         id: p.id,
         name: p.name,
         character: p.character,
-        deck: this.shuffle((decks[i] || []).map(cloneCard)),
+        deck: this.shuffle((decks[i] || []).map(card => ({ ...cloneCard(card), ownerPlayer: i }))),
         hand: [],
         field: Array(5).fill(null),
         graveyard: [],
         summonedThisTurn: false,
+        summonCount: 0,
+        summonLimit: 1,
         specialUsed: false,
       })),
     };
@@ -81,10 +86,19 @@ export class GameEngine {
     const p = this.player(playerIndex);
     const card = p.field[slot];
     if (!card) return;
-    p.graveyard.push(card);
+    this.sendToGraveyard(card, playerIndex);
     p.field[slot] = null;
     this.emit('destroy', { player: playerIndex, slot, card: { ...card }, reason });
   }
+
+  cardOwner(card, fallback) { return Number.isInteger(card.ownerPlayer) ? card.ownerPlayer : fallback; }
+  sendToGraveyard(card, controller) { this.player(this.cardOwner(card, controller)).graveyard.push(card); }
+  summonsUsed(playerIndex) {
+    const p = this.player(playerIndex);
+    return p.summonedThisTurn ? Math.max(1, p.summonCount ?? 0) : 0;
+  }
+  remainingSummons(playerIndex) { return Math.max(0, (this.player(playerIndex).summonLimit ?? 1) - this.summonsUsed(playerIndex)); }
+  selectCardChoice(playerIndex, key = null) { return selectCardChoice(this, playerIndex, key); }
 
   draw(playerIndex, count = 1, { log = true } = {}) {
     if (this.state.phase === PHASES.GAME_OVER) return;
@@ -110,7 +124,7 @@ export class GameEngine {
     const p = this.player(playerIndex);
     const card = p.hand.find(c => c.id === cardId);
     if (!card || ![CARD_TYPES.FAMILIAR, CARD_TYPES.WITCH].includes(card.type)) return false;
-    if (p.summonedThisTurn) return false;
+    if (this.remainingSummons(playerIndex) === 0) return false;
     if (card.type === CARD_TYPES.FAMILIAR) return p.field.includes(null);
     return this.validTributeSets(playerIndex, card).length > 0;
   }
@@ -211,13 +225,13 @@ export class GameEngine {
       if (!p.field.includes(null) && !freesField) throw new Error('場が満杯です。場の使い魔・魔女を1体以上生贄にしてください。');
 
       for (const source of sources.filter(source => source.zone === 'field')) {
-        p.graveyard.push(p.field[source.slot]);
+        this.sendToGraveyard(p.field[source.slot], playerIndex);
         p.field[source.slot] = null;
       }
       for (const source of sources.filter(source => source.zone === 'hand')) {
         const idx = p.hand.findIndex(c => c.id === source.id);
         const [tribute] = p.hand.splice(idx, 1);
-        p.graveyard.push(tribute);
+        this.sendToGraveyard(tribute, playerIndex);
       }
       this.log(`${p.name}は場・手札から生贄を捧げた（合計攻撃値 ${total}）`);
     }
@@ -229,6 +243,7 @@ export class GameEngine {
     if (destination < 0) throw new Error('Monster zones are full.');
     p.field[destination] = summonedCard;
     summonedCard.attackedTurn = null;
+    p.summonCount = this.summonsUsed(playerIndex) + 1;
     p.summonedThisTurn = true;
     this.emit('summon', { player: playerIndex, slot: destination, card: { ...summonedCard }, tributes: structuredClone(normalized) });
     this.log(`${p.name}が${summonedCard.name}を召喚`);
@@ -240,19 +255,13 @@ export class GameEngine {
     if (this.state.phase !== PHASES.MAIN || this.state.pendingDecision) return false;
     if (this.state.activePlayer !== playerIndex || this.state.priorityPlayer !== playerIndex) return false;
     const card = this.player(playerIndex).hand.find(c => c.id === cardId);
-    return card?.type === CARD_TYPES.MAGIC && card.effect === 'draw';
+    return card?.type === CARD_TYPES.MAGIC && (card.effect === 'draw' || (isExtraCard(card) && canUseExtraCard(this, playerIndex, card)));
   }
 
   activateMainMagic(playerIndex, cardId) {
     this.ensurePriority(playerIndex);
     if (!this.canActivateMainMagic(playerIndex, cardId)) throw new Error('This magic cannot be activated now.');
-    const p = this.player(playerIndex);
-    const index = p.hand.findIndex(c => c.id === cardId);
-    const [card] = p.hand.splice(index, 1);
-    p.graveyard.push(card);
-    this.log(`${p.name}が${card.name}を発動`);
-    this.draw(playerIndex, card.value ?? 0);
-    if (this.state.phase !== PHASES.GAME_OVER) this.passPriorityTo(this.opponent(playerIndex));
+    beginCardActivation(this, playerIndex, cardId);
   }
 
   canEnterBattlePhase(playerIndex) {
@@ -309,6 +318,7 @@ export class GameEngine {
     attacker.attackedTurn = this.state.turn;
     this.state.battle = {
       attackerPlayer: playerIndex, attackerSlot,
+      attackerCardId: attacker.id, defenderCardId: defender?.id ?? null,
       defenderPlayer: this.opponent(playerIndex), defenderSlot: targetSlot,
       direct: targetSlot === null,
       attackerBase: attacker.attack ?? 0, defenderBase: defender?.attack ?? 0,
@@ -325,11 +335,12 @@ export class GameEngine {
 
   activatableChainCards(playerIndex) {
     const p = this.player(playerIndex);
-    if (!this.state.battle) return [];
+    if (!this.state.battle && !this.state.chain.length) return [];
     return p.hand.filter(card => card.type === CARD_TYPES.MAGIC && card.chainable && this.canActivateMagic(playerIndex, card));
   }
 
   canActivateMagic(playerIndex, card) {
+    if (isExtraCard(card)) return canUseExtraCard(this, playerIndex, card, true);
     if (card.effect === 'boost') return !!this.state.battle
       && (!this.state.battle.direct || playerIndex === this.state.battle.attackerPlayer);
     if (card.effect === 'nullifyDamage') {
@@ -373,6 +384,11 @@ export class GameEngine {
     if (!d || d.type !== 'CHAIN_RESPONSE' || d.player !== playerIndex) throw new Error('No chain response is pending for this player.');
     if (cardId && (!d.options.includes(cardId) || !this.player(playerIndex).hand.some(c => c.id === cardId)))
       throw new Error('Card is not an available chain option.');
+    if (cardId && isExtraCard(this.player(playerIndex).hand.find(c => c.id === cardId))) {
+      this.state.pendingDecision = null;
+      beginCardActivation(this, playerIndex, cardId, true);
+      return;
+    }
     this.state.pendingDecision = null;
 
     if (!cardId) {
@@ -386,7 +402,7 @@ export class GameEngine {
     const idx = p.hand.findIndex(c => c.id === cardId);
     if (idx < 0 || !d.options.includes(cardId)) throw new Error('Card is not an available chain option.');
     const card = p.hand.splice(idx, 1)[0];
-    this.state.chain.push({ player: playerIndex, card });
+    this.state.chain.push({ id: ++this.state.nextChainId, player: playerIndex, card });
     this.state.chainPassCount = 0;
     this.log(`CHAIN ${this.state.chain.length}: ${p.name}が${card.name}を発動`);
     if (card.effect === 'nullifyDamage') {
@@ -400,11 +416,36 @@ export class GameEngine {
   resolveChainAndBattle() {
     this.state.pendingDecision = null;
     while (this.state.chain.length) {
-      const item = this.state.chain.pop();
-      this.resolveMagic(item.player, item.card);
+      const item = this.state.chain.at(-1);
+      if (item.negated) {
+        this.state.chain.pop();
+        this.sendToGraveyard(item.card, item.player);
+        continue;
+      }
+      const resolved = resolveExtraCard(this, item);
+      if (resolved === false) return;
+      this.state.chain.pop();
+      if (resolved === null) this.resolveMagic(item.player, item.card);
+      else {
+        this.sendToGraveyard(item.card, item.player);
+        this.emit('magic', { player: item.player, card: { ...item.card } });
+        this.log(`${item.card.name}を解決`);
+      }
     }
     this.setPhase(this.state.resumePhase ?? PHASES.BATTLE);
-    if (this.state.battle) this.resolveBattle();
+    if (this.state.battle) {
+      const b = this.state.battle;
+      const attacker = this.player(b.attackerPlayer).field[b.attackerSlot];
+      const defender = b.direct ? null : this.player(b.defenderPlayer).field[b.defenderSlot];
+      if (!attacker || (b.attackerCardId && attacker.id !== b.attackerCardId)
+        || (!b.direct && (!defender || (b.defenderCardId && defender.id !== b.defenderCardId)))) {
+        this.emit('battleCancelled', { ...structuredClone(b) });
+        this.log('戦闘参加カードが場を離れたため、この戦闘を中止');
+        this.state.battlePhaseEnded = !!b.endBattlePhase;
+        this.state.battle = null;
+        this.state.priorityPlayer = this.state.activePlayer;
+      } else this.resolveBattle();
+    } else this.state.priorityPlayer = this.opponent(this.state.activePlayer);
   }
 
   resolveMagic(playerIndex, card) {
@@ -417,7 +458,7 @@ export class GameEngine {
       battle.damagePrevented[playerIndex] = true;
       battle.endBattlePhase = true;
     }
-    this.player(playerIndex).graveyard.push(card);
+    this.sendToGraveyard(card, playerIndex);
     this.emit('magic', { player: playerIndex, card: { ...card } });
   }
 
@@ -562,6 +603,8 @@ export class GameEngine {
     this.state.priorityPlayer = this.state.activePlayer;
     this.setPhase(PHASES.MAIN);
     this.player(this.state.activePlayer).summonedThisTurn = false;
+    this.player(this.state.activePlayer).summonCount = 0;
+    this.player(this.state.activePlayer).summonLimit = 1;
     this.draw(this.state.activePlayer, 1);
     if (this.state.phase !== PHASES.GAME_OVER) {
       this.log(`ターン${this.state.turn}: ${this.player(this.state.activePlayer).name}`);

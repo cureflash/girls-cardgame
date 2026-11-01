@@ -7,6 +7,7 @@ export class Policy {
     if (data.format !== 'girls-cardgame-mlp-v1' || data.rulesVersion !== spec.rulesVersion
       || data.observationSize !== spec.observationSize || data.actionCount !== spec.actionCount)
       throw new Error('このAIは現在のルールに対応していません。最新コードで再学習・書き出してください。');
+    this.characters = Array.isArray(data.characters) ? data.characters.filter(id => typeof id === 'string') : null;
     if (!Array.isArray(data.layers) || data.layers.length < 1 || data.layers.length > 8) throw new Error('AIファイルの層が不正です。');
     let input = spec.observationSize;
     this.layers = data.layers.map((layer, i) => {

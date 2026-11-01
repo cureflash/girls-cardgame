@@ -1,7 +1,9 @@
 import readline from 'node:readline';
-import { GameEngine } from '../src/game-engine.js';
-import { CHARACTERS, createMadokaDeck, createMamiDeck } from '../src/card-data.js';
-import { RLAdapter, rlSpec } from '../src/rl-adapter.js';
+import { GameEngine } from '../src/character-engine.js';
+import { CHARACTERS, createDeck } from '../src/card-data.js';
+import { CharacterAdapter } from '../src/character-adapter.js';
+import { rlSpec } from '../src/rl-adapter.js';
+import { chooseBaselineAction } from '../src/baseline-ai.js';
 
 function mulberry32(seed) {
   let a = seed >>> 0;
@@ -15,8 +17,7 @@ function mulberry32(seed) {
 }
 
 function deckFor(characterId) {
-  if (characterId === 'mami') return createMamiDeck();
-  return createMadokaDeck();
+  return createDeck(characterId);
 }
 
 let engine = null;
@@ -48,7 +49,7 @@ function reset(message = {}) {
     openingHand: Number.isInteger(message.openingHand) ? message.openingHand : 5,
     rng: mulberry32(seed),
   });
-  adapter = new RLAdapter(engine);
+  adapter = new CharacterAdapter(engine);
   return { ...payload(), seed };
 }
 
@@ -66,6 +67,9 @@ function handle(message) {
     }
     case 'state':
       return payload();
+    case 'expert-action':
+      if (!adapter) throw new Error('Environment has not been reset.');
+      return { ok: true, action: chooseBaselineAction(adapter, adapter.currentPlayer(), engine.rng) };
     default:
       throw new Error(`Unknown command: ${message.cmd}`);
   }

@@ -7,6 +7,8 @@ export function cardForDuelLog(card) {
     code: card.code ?? null,
     name: card.name,
     type: card.type,
+    kind: card.kind ?? null,
+    ownerPlayer: card.ownerPlayer ?? null,
     attack: card.attack ?? null,
     rank: card.rank ?? null,
     tributeThreshold: card.tributeThreshold ?? null,
@@ -27,9 +29,9 @@ export function captureDuelState(engine) {
     pendingDecision: clone(s.pendingDecision),
     battle: clone(s.battle),
     battlePhaseEnded: Boolean(s.battlePhaseEnded),
-    chain: s.chain.map(item => ({ player: item.player, card: cardForDuelLog(item.card) })),
+    chain: s.chain.map(item => ({ id: item.id ?? null, player: item.player, card: cardForDuelLog(item.card), targets: clone(item.targets ?? []), negated: Boolean(item.negated) })),
     winner: s.winner,
-    players: s.players.map(player => ({
+    players: s.players.map((player, index) => ({
       id: player.id,
       name: player.name,
       character: player.character?.id ?? null,
@@ -38,6 +40,8 @@ export function captureDuelState(engine) {
       field: player.field.map(cardForDuelLog),
       graveyard: player.graveyard.map(cardForDuelLog),
       summonedThisTurn: Boolean(player.summonedThisTurn),
+      summonCount: engine.summonsUsed(index),
+      summonLimit: player.summonLimit ?? 1,
       specialUsed: Boolean(player.specialUsed),
     })),
   };

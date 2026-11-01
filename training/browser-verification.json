@@ -1,0 +1,10 @@
+{
+  "parityDecisions": 32,
+  "games": 40,
+  "wins": 6,
+  "losses": 34,
+  "truncated": 0,
+  "modelDecisions": 3058,
+  "meanInferenceMs": 1.256,
+  "policySha256": "a42668f29b53f53254515b359125d04b262835138dae490a60590be3c51f0554"
+}

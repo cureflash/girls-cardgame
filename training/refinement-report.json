@@ -1,0 +1,194 @@
+{
+  "method": "DAgger",
+  "sourceCheckpoint": "models/sites-training/best.zip",
+  "seed": 20261102,
+  "rulesVersion": "2026-11-01-forty-card-effects-v1",
+  "additionalExpertDecisions": 32000,
+  "epochsPerIteration": 12,
+  "bestCandidate": "dagger-03",
+  "validation": [
+    {
+      "candidate": "dagger-01",
+      "baseline": {
+        "games": 48,
+        "wins": 10,
+        "losses": 38,
+        "truncated": 0,
+        "byCharacter": {
+          "madoka": [
+            5,
+            18
+          ],
+          "mami": [
+            5,
+            20
+          ]
+        },
+        "winRate": 0.20833333333333334
+      },
+      "random": {
+        "games": 48,
+        "wins": 39,
+        "losses": 9,
+        "truncated": 0,
+        "byCharacter": {
+          "madoka": [
+            21,
+            7
+          ],
+          "mami": [
+            18,
+            2
+          ]
+        },
+        "winRate": 0.8125
+      }
+    },
+    {
+      "candidate": "dagger-02",
+      "baseline": {
+        "games": 48,
+        "wins": 8,
+        "losses": 39,
+        "truncated": 1,
+        "byCharacter": {
+          "madoka": [
+            4,
+            19
+          ],
+          "mami": [
+            4,
+            20
+          ]
+        },
+        "winRate": 0.1702127659574468
+      },
+      "random": {
+        "games": 48,
+        "wins": 42,
+        "losses": 6,
+        "truncated": 0,
+        "byCharacter": {
+          "madoka": [
+            25,
+            3
+          ],
+          "mami": [
+            17,
+            3
+          ]
+        },
+        "winRate": 0.875
+      }
+    },
+    {
+      "candidate": "dagger-03",
+      "baseline": {
+        "games": 48,
+        "wins": 13,
+        "losses": 35,
+        "truncated": 0,
+        "byCharacter": {
+          "madoka": [
+            8,
+            15
+          ],
+          "mami": [
+            5,
+            20
+          ]
+        },
+        "winRate": 0.2708333333333333
+      },
+      "random": {
+        "games": 48,
+        "wins": 42,
+        "losses": 6,
+        "truncated": 0,
+        "byCharacter": {
+          "madoka": [
+            25,
+            3
+          ],
+          "mami": [
+            17,
+            3
+          ]
+        },
+        "winRate": 0.875
+      }
+    },
+    {
+      "candidate": "dagger-04",
+      "baseline": {
+        "games": 48,
+        "wins": 12,
+        "losses": 36,
+        "truncated": 0,
+        "byCharacter": {
+          "madoka": [
+            8,
+            15
+          ],
+          "mami": [
+            4,
+            21
+          ]
+        },
+        "winRate": 0.25
+      },
+      "random": {
+        "games": 48,
+        "wins": 42,
+        "losses": 6,
+        "truncated": 0,
+        "byCharacter": {
+          "madoka": [
+            26,
+            2
+          ],
+          "mami": [
+            16,
+            4
+          ]
+        },
+        "winRate": 0.875
+      }
+    }
+  ],
+  "heldOutBaseline": {
+    "games": 100,
+    "wins": 32,
+    "losses": 68,
+    "truncated": 0,
+    "byCharacter": {
+      "madoka": [
+        22,
+        39
+      ],
+      "mami": [
+        10,
+        29
+      ]
+    },
+    "winRate": 0.32
+  },
+  "heldOutRandom": {
+    "games": 100,
+    "wins": 86,
+    "losses": 14,
+    "truncated": 0,
+    "byCharacter": {
+      "madoka": [
+        47,
+        6
+      ],
+      "mami": [
+        39,
+        8
+      ]
+    },
+    "winRate": 0.86
+  },
+  "durationSeconds": 474.9
+}

@@ -1,0 +1,239 @@
+{
+  "seed": 20261101,
+  "rulesVersion": "2026-11-01-forty-card-effects-v1",
+  "architecture": [
+    96,
+    96
+  ],
+  "warmupDecisions": 12000,
+  "warmupEpochs": 16,
+  "totalPpoSteps": 131072,
+  "bestCandidate": "ppo-03.zip",
+  "validation": [
+    {
+      "candidate": "warmup",
+      "timesteps": 0,
+      "baseline": {
+        "games": 48,
+        "wins": 9,
+        "losses": 38,
+        "truncated": 1,
+        "byCharacter": {
+          "madoka": [
+            4,
+            19
+          ],
+          "mami": [
+            5,
+            19
+          ]
+        },
+        "winRate": 0.19148936170212766
+      },
+      "random": {
+        "games": 48,
+        "wins": 39,
+        "losses": 8,
+        "truncated": 1,
+        "byCharacter": {
+          "madoka": [
+            24,
+            3
+          ],
+          "mami": [
+            15,
+            5
+          ]
+        },
+        "winRate": 0.8297872340425532
+      }
+    },
+    {
+      "candidate": "ppo-01",
+      "timesteps": 32768,
+      "baseline": {
+        "games": 48,
+        "wins": 6,
+        "losses": 42,
+        "truncated": 0,
+        "byCharacter": {
+          "madoka": [
+            2,
+            21
+          ],
+          "mami": [
+            4,
+            21
+          ]
+        },
+        "winRate": 0.125
+      },
+      "random": {
+        "games": 48,
+        "wins": 36,
+        "losses": 12,
+        "truncated": 0,
+        "byCharacter": {
+          "madoka": [
+            21,
+            7
+          ],
+          "mami": [
+            15,
+            5
+          ]
+        },
+        "winRate": 0.75
+      }
+    },
+    {
+      "candidate": "ppo-02",
+      "timesteps": 65536,
+      "baseline": {
+        "games": 48,
+        "wins": 7,
+        "losses": 40,
+        "truncated": 1,
+        "byCharacter": {
+          "madoka": [
+            1,
+            22
+          ],
+          "mami": [
+            6,
+            18
+          ]
+        },
+        "winRate": 0.14893617021276595
+      },
+      "random": {
+        "games": 48,
+        "wins": 38,
+        "losses": 9,
+        "truncated": 1,
+        "byCharacter": {
+          "madoka": [
+            23,
+            5
+          ],
+          "mami": [
+            15,
+            4
+          ]
+        },
+        "winRate": 0.8085106382978723
+      }
+    },
+    {
+      "candidate": "ppo-03",
+      "timesteps": 98304,
+      "baseline": {
+        "games": 48,
+        "wins": 14,
+        "losses": 34,
+        "truncated": 0,
+        "byCharacter": {
+          "madoka": [
+            7,
+            16
+          ],
+          "mami": [
+            7,
+            18
+          ]
+        },
+        "winRate": 0.2916666666666667
+      },
+      "random": {
+        "games": 48,
+        "wins": 41,
+        "losses": 7,
+        "truncated": 0,
+        "byCharacter": {
+          "madoka": [
+            23,
+            5
+          ],
+          "mami": [
+            18,
+            2
+          ]
+        },
+        "winRate": 0.8541666666666666
+      }
+    },
+    {
+      "candidate": "ppo-04",
+      "timesteps": 131072,
+      "baseline": {
+        "games": 48,
+        "wins": 8,
+        "losses": 39,
+        "truncated": 1,
+        "byCharacter": {
+          "madoka": [
+            5,
+            17
+          ],
+          "mami": [
+            3,
+            22
+          ]
+        },
+        "winRate": 0.1702127659574468
+      },
+      "random": {
+        "games": 48,
+        "wins": 44,
+        "losses": 4,
+        "truncated": 0,
+        "byCharacter": {
+          "madoka": [
+            27,
+            1
+          ],
+          "mami": [
+            17,
+            3
+          ]
+        },
+        "winRate": 0.9166666666666666
+      }
+    }
+  ],
+  "heldOutBaseline": {
+    "games": 100,
+    "wins": 26,
+    "losses": 74,
+    "truncated": 0,
+    "byCharacter": {
+      "madoka": [
+        13,
+        48
+      ],
+      "mami": [
+        13,
+        26
+      ]
+    },
+    "winRate": 0.26
+  },
+  "heldOutRandom": {
+    "games": 100,
+    "wins": 89,
+    "losses": 10,
+    "truncated": 1,
+    "byCharacter": {
+      "madoka": [
+        50,
+        3
+      ],
+      "mami": [
+        39,
+        7
+      ]
+    },
+    "winRate": 0.898989898989899
+  },
+  "durationSeconds": 1132.2
+}

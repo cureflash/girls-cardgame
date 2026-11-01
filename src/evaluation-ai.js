@@ -1,5 +1,6 @@
 import { ACTIONS, ATTACK_TARGETS, RL_LIMITS, tributeMaskToSlots } from './rl-adapter.js';
 import { CARD_TYPES } from './game-engine.js';
+import { cardEffectScore } from './card-effect-ai.js';
 
 export const EVALUATION_POLICY_FORMAT = 'girls-cardgame-eval-v1';
 export const EVALUATION_RULES_VERSION = '2026-09-13-hand-tributes-shield-ga-v1';
@@ -365,6 +366,8 @@ export function actionFeatures(adapter, playerIndex, action) {
 }
 
 export function scoreEvaluationAction(adapter, playerIndex, action, genome = DEFAULT_GENOME) {
+  const extraScore = cardEffectScore(adapter, playerIndex, action);
+  if (extraScore !== null) return { score: extraScore, features: emptyFeatures() };
   const normalized = normalizeEvaluationGenome(genome);
   const features = actionFeatures(adapter, playerIndex, action);
   let score = 0;

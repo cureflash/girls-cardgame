@@ -99,6 +99,10 @@ function decodeAction(adapter, action, playerIndex) {
   if (action === ACTIONS.ENTER_BATTLE) return { kind: 'enter-battle' };
   if (action === ACTIONS.CONTINUE_BATTLE) return { kind: 'continue-battle' };
   if (action === ACTIONS.SPECIAL) return { kind: 'special', character: p.character?.id ?? 'unknown' };
+  if (adapter.engine.state.pendingDecision?.type === 'CARD_CHOICE') {
+    const d = adapter.engine.state.pendingDecision, option = d.options[action - ACTIONS.CHOICE_BASE];
+    return { kind: 'card-choice', stage: d.stage, key: option?.key ?? String(action) };
+  }
 
   if (action >= ACTIONS.SUMMON_BASE && action < ACTIONS.ATTACK_BASE) {
     const offset = action - ACTIONS.SUMMON_BASE;
@@ -131,7 +135,7 @@ function decodeAction(adapter, action, playerIndex) {
     const card = p.hand[action - ACTIONS.CHAIN_BASE];
     return { kind: 'chain', effect: card?.effect ?? 'unknown', value: card?.value ?? 0 };
   }
-  if (action >= ACTIONS.REVIVE_BASE && action < ACTIONS.COUNT) {
+  if (action >= ACTIONS.REVIVE_BASE && action < ACTIONS.CHOICE_BASE) {
     const card = p.graveyard[action - ACTIONS.REVIVE_BASE];
     return { kind: 'revive', attack: card?.attack ?? 0 };
   }
@@ -223,6 +227,8 @@ function strategicOptions(adapter, playerIndex, legalActions = adapter.legalActi
 
   const mainMagic = decoded.filter(entry => entry.decoded.kind === 'main-magic');
   for (const entry of mainMagic) options.set(`main-magic:${entry.decoded.effect}`, entry.action);
+  for (const entry of chain.filter(x => !['boost', 'nullifyDamage'].includes(x.decoded.effect))) options.set(`chain:${entry.decoded.effect}`, entry.action);
+  for (const entry of decoded.filter(x => x.decoded.kind === 'card-choice')) options.set(`choice:${entry.decoded.stage}:${entry.decoded.key}`, entry.action);
 
   const revives = decoded.filter(entry => entry.decoded.kind === 'revive');
   if (revives.length) {
