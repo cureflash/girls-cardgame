@@ -72,7 +72,7 @@ export function createDeck(characterId, skinId = characterId, idPrefix = charact
   magic('nullifyDamage', '盾', 0, 'shield', 3, true);
   for (const [effect, copies] of EXTRA_DECKS[characterId] ?? []) {
     const data = EXTRA_CARDS[effect];
-    add(`extra-${effect}`, { ...data, effect, type: CARD_TYPES.MAGIC, chainable: ['evacuation', 'jammer'].includes(effect) }, copies);
+    add(`extra-${effect}`, { ...data, effect, type: CARD_TYPES.MAGIC, chainable: ['evacuation', 'jammer'].includes(effect), image: `./assets/cards/extra/${effect}.webp?v=extra-art1` }, copies);
   }
   return cards; // Madoka/Mami: 40; other characters: original 30.
 }
