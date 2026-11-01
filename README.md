@@ -100,6 +100,8 @@ npm test
 
 ## 強化学習
 
+Sites版は `assets/ai/policy.json` の学習済みモデルを自動で読み込み、まどか・マミのCPUに使う。他のキャラは既存の評価AIを使う。手動で読み込んだモデルを優先し、読み込みに失敗したときは評価AIで続行する。
+
 強化学習はゲームエンジンの上にアダプタを置き、合法手だけを action mask として `MaskablePPO` に渡す。相手の手札内容やデッキ順は観測に含めない。
 
 フェイズ制約もRL側で再実装せず、エンジンの `canSummon` / `canEnterBattlePhase` / `canContinueBattlePhase` / `canAttack` / `canUseSpecial` / `canEndTurn` などの判定結果だけを action mask に変換する。
@@ -123,6 +125,23 @@ pip install -r rl/requirements.txt
 Linux/macOSでは仮想環境の有効化を `source .venv/bin/activate` に読み替える。
 
 ### 3. 自己対戦学習
+
+40枚版の公開用モデルは、評価AIの判断による予備学習の後、評価AIとの対戦・前世代モデルとの自己対戦を交互に行う。対戦評価で採用候補を選び、別の乱数種で100戦ずつ評価する。
+
+```bash
+python rl/train_deploy.py --output models/sites-training
+node rl/verify-export.mjs models/sites-training/policy.json models/sites-training/parity-fixtures.json
+```
+
+実行環境の固定バージョンは `rl/requirements-training.txt` に記録する。PyTorchは公式CPU配布元から導入する。採用モデルの学習記録とチェックポイントはSitesソースの `training/` に保存する。
+
+学習モデルが自分で進んだ局面を評価AIに採点させて再学習する場合は、次を実行する。追加候補も同じ検証用対戦で比較し、採用後の成績は別の100戦で測る。
+
+```bash
+python rl/refine_policy.py models/sites-training/best.zip
+```
+
+汎用の長期自己対戦コマンド:
 
 ```bash
 python rl/train.py --generations 20 --steps-per-generation 100000

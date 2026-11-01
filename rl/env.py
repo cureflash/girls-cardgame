@@ -77,11 +77,17 @@ class GirlsCardGameEnv(gym.Env):
         self.py_rng = random.Random(seed)
         self.agent_player = 0
         self.opponent_model = None
+        self.opponent_baseline = False
         self._last: dict[str, Any] | None = None
         self._actions = 0
 
     def set_opponent_model(self, model) -> None:
         self.opponent_model = model
+        self.opponent_baseline = False
+
+    def set_opponent_baseline(self) -> None:
+        self.opponent_model = None
+        self.opponent_baseline = True
 
     def action_masks(self) -> np.ndarray:
         if not self._last:
@@ -93,6 +99,8 @@ class GirlsCardGameEnv(gym.Env):
         legal = np.flatnonzero(mask)
         if legal.size == 0:
             raise RuntimeError("Opponent has no legal action in a non-terminal state")
+        if self.opponent_baseline:
+            return int(self.bridge.request({"cmd": "expert-action"})["action"])
         if self.opponent_model is None:
             return int(self.py_rng.choice(legal.tolist()))
         action, _ = self.opponent_model.predict(

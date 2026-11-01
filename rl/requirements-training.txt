@@ -1,0 +1,6 @@
+# Versions used for the Sites policy (CPU build of torch).
+torch==2.15.0+cpu
+gymnasium==1.4.0
+numpy==2.5.4
+stable-baselines3==2.9.2
+sb3-contrib==2.9.2

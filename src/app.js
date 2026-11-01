@@ -4,11 +4,12 @@ import { cardLore } from './card-lore.js';
 import { CharacterAdapter } from './character-adapter.js?v=cards40';
 import { RULES_VERSION } from './rl-adapter.js';
 import { chooseBaselineAction } from './baseline-ai.js';
-import { Policy } from './policy.js';
+import { Policy } from './policy.js?v=trained40';
 import { buildDuelLog, captureDuelState, createDuelTrace, recordDuelStep } from './duel-log.js?v=cards40';
 
 const $ = selector => document.querySelector(selector);
 let engine, adapter, duelTrace, human = 0, mode = 'cpu', policy = null, timer, generation = 0, eventCursor = 0;
+let bundledPolicyPending = true;
 let selection = null, tributes = [], attacker = null, target = null;
 const node = (tag, className, text) => { const el = document.createElement(tag); el.className = className; if (text !== undefined) el.textContent = text; return el; };
 const typeName = card => card.kind === 'trap' ? '罠' : ({ familiar: '使い魔', witch: '魔女', magic: '魔法' })[card.type];
@@ -25,10 +26,13 @@ function description(card) {
 function clear() { selection = null; tributes = []; attacker = null; target = null; }
 function humanTurn() { return mode === 'local' || adapter.currentPlayer() === human; }
 function notify(text = '') { $('#notice').textContent = text; $('#notice').hidden = !text; }
+function activePolicy(playerIndex) {
+  return policy && (!policy.characters || policy.characters.includes(engine.player(playerIndex).character.id)) ? policy : null;
+}
 function controllerFor(playerIndex) {
   if (mode === 'local') return `local-player-${playerIndex + 1}`;
   if (playerIndex === human) return 'human';
-  return policy ? 'trained-ai' : 'baseline-ai';
+  return activePolicy(playerIndex) ? 'trained-ai' : 'baseline-ai';
 }
 function showDetail(card) {
   const root = $('#card-detail');
@@ -68,7 +72,8 @@ function start() {
     decks,
   });
   adapter = new CharacterAdapter(engine);
-  duelTrace = createDuelTrace({ engine, mode, humanSeat: human, rulesVersion: RULES_VERSION, ai: policy ? 'trained-ai' : 'baseline-ai' });
+  duelTrace = createDuelTrace({ engine, mode, humanSeat: human, rulesVersion: RULES_VERSION, ai: activePolicy(1 - human) ? 'trained-ai' : 'baseline-ai' });
+  $('#ai-name').textContent = activePolicy(1 - human) ? '学習済みAI' : '評価AI';
   $('#card-detail').replaceChildren(node('p', 'muted', 'カードに触れると、ここに詳細を表示します。'), node('div', 'detail-placeholder', '✦'));
   finishAction();
 }
@@ -123,14 +128,15 @@ function finishAction() {
 
 function scheduleAI() {
   clearTimeout(timer);
-  if (mode === 'local' || engine.state.phase === PHASES.GAME_OVER || humanTurn() || globalThis.__duelCutsceneActive) return;
+  if (mode === 'local' || engine.state.phase === PHASES.GAME_OVER || humanTurn() || bundledPolicyPending || globalThis.__duelCutsceneActive) return;
   const duel = generation;
   timer = setTimeout(() => {
     if (duel !== generation) return;
     perform(() => {
       const player = adapter.currentPlayer(), legal = adapter.legalActions(player);
-      let action, controller = policy ? 'trained-ai' : 'baseline-ai';
-      try { action = policy ? policy.choose(adapter.observation(player), legal) : chooseBaselineAction(adapter, player); }
+      const selectedPolicy = activePolicy(player);
+      let action, controller = selectedPolicy ? 'trained-ai' : 'baseline-ai';
+      try { action = selectedPolicy ? selectedPolicy.choose(adapter.observation(player), legal) : chooseBaselineAction(adapter, player); }
       catch (error) { policy = null; controller = 'baseline-ai'; $('#ai-name').textContent = '基本AI'; notify(`${error.message} 基本AIで続けます。`); action = chooseBaselineAction(adapter, player); }
       adapter.applyAction(action, player);
       return { action: { type: 'rl-action', actionId: action }, controller };
@@ -519,8 +525,8 @@ $('#policy-file').onchange = async event => {
   const file = event.target.files[0]; if (!file) return;
   try {
     if (file.size > 40 * 1024 * 1024) throw new Error('AIファイルは40MB以下にしてください。');
-    const loaded = new Policy(JSON.parse(await file.text())); policy = loaded;
-    $('#ai-name').textContent = '強化学習AI'; notify('学習済みAIを読み込みました。'); scheduleAI();
+    const loaded = new Policy(JSON.parse(await file.text())); policy = loaded; bundledPolicyPending = false;
+    $('#ai-name').textContent = activePolicy(1 - human) ? '学習済みAI' : '評価AI'; notify('学習済みAIを読み込みました。'); scheduleAI();
   } catch (error) { notify(`読み込めませんでした：${error.message}`); }
   event.target.value = '';
 };
@@ -528,3 +534,20 @@ document.addEventListener('keydown', event => { if (event.key === 'Escape' && !e
 window.addEventListener('duel:cutscene-end', scheduleAI);
 $('#seat').disabled = $('#mode').value === 'local';
 start();
+
+async function loadBundledPolicy() {
+  try {
+    const response = await fetch(new URL('../assets/ai/policy.json', import.meta.url), { cache: 'no-cache' });
+    if (!response.ok) throw new Error(`AIの読み込みに失敗しました (${response.status})`);
+    const loaded = new Policy(await response.json());
+    if (policy) return; // A manually uploaded policy takes precedence.
+    policy = loaded;
+    $('#ai-name').textContent = activePolicy(1 - human) ? '学習済みAI' : '評価AI';
+  } catch (error) {
+    if (!policy) notify('学習済みAIを読み込めなかったため、評価AIで続けます。');
+  } finally {
+    bundledPolicyPending = false;
+    scheduleAI();
+  }
+}
+loadBundledPolicy();
