@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import readline from 'node:readline';
 
-test('RL server uses canonical characters, forty-card decks and legal expert actions', async () => {
+test('RL server uses canonical characters and legal expert actions', async () => {
   const child = spawn(process.execPath, [new URL('../rl/server.mjs', import.meta.url).pathname], { stdio: ['pipe', 'pipe', 'pipe'] });
   const reader = readline.createInterface({ input: child.stdout });
   const pending = [];

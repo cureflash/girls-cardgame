@@ -58,7 +58,10 @@ function view(engine, humanTurn = () => true) {
 }
 
 const monster = (id, ownerPlayer, attack = 3) => ({ id, name: id, type: 'familiar', attack, ownerPlayer });
-const spell = effect => ({ ...['madoka', 'mami'].flatMap(createDeck).find(card => card.effect === effect), id: effect });
+function spell(effect) {
+  const data = EXTRA_CARDS[effect];
+  return { ...data, id: effect, effect, type: CARD_TYPES.MAGIC, chainable: data.kind === 'trap' };
+}
 function duel(initiator = 0) {
   const ids = initiator === 0 ? ['mami', 'madoka'] : ['madoka', 'mami'];
   const engine = new GameEngine({ players: ids.map(id => ({ name: id, character: CHARACTERS[id] })), decks: ids.map(createDeck), openingHand: 0 });
@@ -134,7 +137,7 @@ test('Avarice dialog updates its selected-monster count', () => {
   }
 });
 
-test('all nine added cards finish their cost, target and response dialogs through UI buttons', () => {
+test('supported extra card effects finish their cost, target and response dialogs through UI buttons', () => {
   const stages = new Set();
   for (const effect of Object.keys(EXTRA_CARDS)) {
     const engine = duel(effect === 'jammer' ? 1 : 0), ui = view(engine);

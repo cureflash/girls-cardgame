@@ -27,16 +27,13 @@ function pass(e) {
   if (!e.state.pendingDecision && e.state.phase === 'MAIN' && e.state.priorityPlayer !== e.state.activePlayer) e.passPriorityTo(e.state.activePlayer);
 }
 
-test('approved packages are exactly ten cards each and omit both rejected cards', () => {
-  const expected = {
-    mami: { evacuation: 2, doomed: 2, doubleSummon: 2, jammer: 2, swap: 2 },
-    madoka: { evacuation: 2, mallet: 2, jammer: 2, reincarnate: 2, reborn: 1, avarice: 1 },
-  };
-  for (const [character, effects] of Object.entries(expected)) {
+test('Madoka and Mami each add two copies of both traps and no spells', () => {
+  const expected = { evacuation: 2, jammer: 2 };
+  for (const character of ['mami', 'madoka']) {
     const deck = createDeck(character), extra = deck.slice(30);
-    assert.equal(extra.length, 10);
-    assert.deepEqual(Object.fromEntries(Object.keys(effects).map(effect => [effect, extra.filter(c => c.effect === effect).length])), effects);
-    assert.ok(extra.every(c => c.type === 'magic' && !['強欲な壺', '和睦の使者'].includes(c.name)));
+    assert.equal(extra.length, 4);
+    assert.deepEqual(Object.fromEntries(Object.keys(expected).map(effect => [effect, extra.filter(c => c.effect === effect).length])), expected);
+    assert.ok(extra.every(c => c.type === 'magic' && c.kind === 'trap'));
     assert.equal(deck.filter(c => c.type === 'familiar').length, 13);
     assert.equal(deck.filter(c => c.type === 'witch').length, 7);
   }

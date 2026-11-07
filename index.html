@@ -11,6 +11,7 @@
   {
     "imports": {
       "./src/card-data.js": "./src/card-data.js?v=cards40-art1",
+      "./src/card-effects.js": "./src/card-effects.js?v=traps34",
       "./src/baseline-ai.js": "./src/baseline-ai.js?v=cards40",
       "./src/evaluation-ai.js": "./src/evaluation-ai.js?v=cards40",
       "./src/rl-adapter.js": "./src/rl-adapter.js?v=cards40",
@@ -100,8 +101,8 @@
       <section class="inspection"><h2>カード詳細</h2><div id="card-detail"><p class="muted">カードに触れると、ここに詳細を表示します。</p><div class="detail-placeholder" aria-hidden="true">✦</div></div></section>
       <details class="history" open><summary>デュエルログ</summary><button id="export-log" class="quiet" type="button">解析用JSONを保存</button><ol id="log"></ol></details>
       <details class="rules"><summary>遊び方・キャラ能力</summary>
-        <p>山札がライフ。戦闘ダメージで山札が0枚になると敗北します。ドローで0枚になっても、その時点では敗北しません。通常召喚は原則1ターン1体、二重召喚の効果中は合計2体まで。先攻1ターン目は攻撃できません。</p>
-        <p>マミ・まどかは既存30枚＋追加魔法・罠10枚の40枚デッキ。追加カードも手札から発動します。強制脱出装置はメインまたは戦闘中、ジャマーは魔法の発動への応答で使えます。ほかの追加魔法はメインで使います。カードの効果・コストは詳細欄で確認できます。</p>
+        <p>山札がライフ。戦闘ダメージで山札が0枚になると敗北します。ドローで0枚になっても、その時点では敗北しません。通常召喚は1ターン1体。先攻1ターン目は攻撃できません。</p>
+        <p>マミ・まどかは元の30枚に強制脱出装置とマジック・ジャマーを各2枚加えた34枚デッキ。罠は手札から発動します。強制脱出装置はメインまたは戦闘中、マジック・ジャマーは魔法の発動への応答で使えます。カードの効果・コストは詳細欄で確認できます。</p>
         <p>魔女は場の使い魔・魔女と手札の使い魔を生贄にできます。盾を使うと、その戦闘では双方の参加モンスターが戦闘破壊されず、自分が受ける戦闘ダメージは0になります。発動した時点でチェーンを終了し、この戦闘の解決後にバトルフェイズを終了します。</p>
         <p>まどか：戦闘ダメージ−1。必殺技で墓地の使い魔・魔女1体を蘇生し、そのターン終了。</p>
         <p>マミ：初期手札−1。ティロ・フィナーレで相手の使い魔・魔女を全破壊し、そのターン終了。</p>

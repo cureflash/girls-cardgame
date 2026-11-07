@@ -169,12 +169,12 @@ test('main-phase magic is not legal after entering battle phase', () => {
   assert.throws(() => e.activateMainMagic(0,'cup'));
 });
 
-test('Madoka adds ten spells/traps without changing the original monster distribution', () => {
+test('Madoka adds four traps without changing the original monster distribution', () => {
   const deck=createMadokaDeck();
-  assert.equal(deck.length,40);
+  assert.equal(deck.length,34);
   assert.equal(deck.filter(c=>c.type===CARD_TYPES.FAMILIAR).length,13);
   assert.equal(deck.filter(c=>c.type===CARD_TYPES.WITCH).length,7);
-  assert.equal(deck.filter(c=>c.type===CARD_TYPES.MAGIC).length,20);
+  assert.equal(deck.filter(c=>c.type===CARD_TYPES.MAGIC).length,14);
   assert.equal(deck.filter(c=>c.type===CARD_TYPES.FAMILIAR && c.attack===3).length,5);
   assert.equal(deck.filter(c=>c.type===CARD_TYPES.WITCH && c.attack===8).length,4);
   assert.equal(deck.filter(c=>c.type===CARD_TYPES.WITCH && c.attack===10).length,2);

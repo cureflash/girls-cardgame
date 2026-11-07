@@ -8,13 +8,13 @@ import { chooseBaselineAction } from '../src/baseline-ai.js';
 
 function rngFor(seed) { return () => { seed = (Math.imul(seed,1664525)+1013904223)>>>0; return seed/4294967296; }; }
 
-test('both forty-card decks keep the original monsters and art and add distinct ten-card packages', () => {
+test('the 34-card decks retain their original monsters and card art', () => {
   const decks=['madoka','mami'].map(createDeck);
   for (const deck of decks) {
-    assert.equal(deck.length,40); assert.equal(new Set(deck.map(c=>c.id)).size,40);
+    assert.equal(deck.length,34); assert.equal(new Set(deck.map(c=>c.id)).size,34);
     assert.equal(deck.filter(c=>c.type==='familiar').length,13);
     assert.equal(deck.filter(c=>c.type==='witch').length,7);
-    assert.equal(deck.filter(c=>c.type==='magic').length,20);
+    assert.equal(deck.filter(c=>c.type==='magic').length,14);
     assert.equal(deck.filter(c=>c.effect==='draw').length,0);
     assert.equal(deck.filter(c=>c.type==='familiar'&&c.attack===3).length,5);
     assert.equal(deck.filter(c=>c.attack===13).length,1);
@@ -49,7 +49,7 @@ function assertWebP(file) {
 
 test('all gameplay card art uses non-placeholder WebP assets', () => {
   const files=[...new Set(['madoka','mami'].flatMap(id=>createDeck(id).filter(c=>c.image).map(c=>c.image.split('?')[0])))];
-  assert.equal(files.length,35);
+  assert.equal(files.length,28);
   for(const file of files) assertWebP(file);
 
   const mamiMonsters=createDeck('mami').filter(c=>c.type!=='magic');
@@ -59,13 +59,21 @@ test('all gameplay card art uses non-placeholder WebP assets', () => {
   assert.notEqual(artist.image,shadow.image);
 });
 
-test('300 seeded random and tactical duels finish legally without card loss or deadlock', () => {
+test('300 seeded duels preserve all cards and legal play through victory or a stalemate', () => {
   for(let game=1;game<=300;game++) {
     const rng=rngFor(game), ids=game%2?['madoka','mami']:['mami','madoka'];
     const e=new GameEngine({players:ids.map(id=>({name:id,character:CHARACTERS[id]})),decks:ids.map(createDeck),rng});
     const a=new RLAdapter(e);
     for(let step=0;e.state.phase!==PHASES.GAME_OVER;step++) {
-      assert.ok(step<800,`game ${game} stuck`);
+      if (step === 800) {
+        // An empty deck does not lose on draw. Without familiars, field cards
+        // or specials, these two decks have no way to restart combat.
+        assert.ok(!e.state.pendingDecision && e.state.players.every(p =>
+          p.deck.length === 0 && p.field.every(card => card === null)
+          && p.specialUsed && !p.hand.some(card => card.type === 'familiar')
+        ), `game ${game} ran out of steps with plays remaining`);
+        break;
+      }
       const player=a.currentPlayer(), legal=a.legalActions(player);
       assert.ok(legal.length); assert.ok(!a.legalActions(1-player).length);
       const observation=a.observation(player);
@@ -73,10 +81,10 @@ test('300 seeded random and tactical duels finish legally without card loss or d
       const action=game%3===0||player===0?legal[Math.floor(rng()*legal.length)]:chooseBaselineAction(a);
       a.applyAction(action);
       const cards=e.state.players.flatMap(p=>[...p.deck,...p.hand,...p.graveyard,...p.field.filter(Boolean)]).concat(e.state.chain.map(c=>c.card));
-      assert.equal(cards.length,80,`card conservation game ${game}`); assert.equal(new Set(cards.map(c=>c.id)).size,80);
-      for (const owner of [0,1]) assert.equal(cards.filter(c=>c.ownerPlayer===owner).length,40);
+      assert.equal(cards.length,68,`card conservation game ${game}`); assert.equal(new Set(cards.map(c=>c.id)).size,68);
+      for (const owner of [0,1]) assert.equal(cards.filter(c=>c.ownerPlayer===owner).length,34);
     }
-    assert.equal(e.player(1-e.state.winner).deck.length,0);
+    if (e.state.phase === PHASES.GAME_OVER) assert.equal(e.player(1-e.state.winner).deck.length,0);
   }
 });
 

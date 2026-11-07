@@ -28,7 +28,7 @@ test('browser player always gets Salvation visual deck and NPC always gets Walpu
   for (const character of Object.keys(CHARACTERS)) {
     const player = createPlayerDeck(character);
     const npc = createNpcDeck(character);
-    const size = ['madoka', 'mami'].includes(character) ? 40 : 30;
+    const size = ['madoka', 'mami'].includes(character) ? 34 : 30;
     assert.equal(player.length, size);
     assert.equal(npc.length, size);
     assert.deepEqual(mechanical(player), mechanical(npc), `${character} skins must remain mechanically identical`);
@@ -56,7 +56,7 @@ test('browser mirror matches use unique card ids across player and NPC decks', (
 
 test('createDeck remains safe as an Array.map callback for analysis code', () => {
   const decks = ['madoka', 'mami', 'sayaka', 'kyoko', 'homura', 'nagisa'].map(createDeck);
-  assert.deepEqual(decks.map(deck => deck.length), [40, 40, 30, 30, 30, 30]);
+  assert.deepEqual(decks.map(deck => deck.length), [34, 34, 30, 30, 30, 30]);
 });
 
 test('canonical six-character engine applies exact starting hands and adapter initializes for every character', () => {
