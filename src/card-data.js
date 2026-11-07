@@ -74,7 +74,7 @@ export function createDeck(characterId, skinId = characterId, idPrefix = charact
     const data = EXTRA_CARDS[effect];
     add(`extra-${effect}`, { ...data, effect, type: CARD_TYPES.MAGIC, chainable: ['evacuation', 'jammer'].includes(effect), image: `./assets/cards/extra/${effect}.webp?v=extra-art1` }, copies);
   }
-  return cards; // Madoka/Mami: 40; other characters: original 30.
+  return cards; // Madoka/Mami: 34; other characters: original 30.
 }
 
 export const createPlayerDeck = characterId => createDeck(characterId, 'madoka', `player-${characterId}`);

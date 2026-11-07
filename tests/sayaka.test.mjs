@@ -32,8 +32,8 @@ test('the original thirty cards remain shared, while only Madoka and Mami get ad
   const madoka = mechanicalDeck('madoka');
   const mami = mechanicalDeck('mami');
   const sayaka = mechanicalDeck('sayaka');
-  assert.equal(madoka.length, 40);
-  assert.equal(mami.length, 40);
+  assert.equal(madoka.length, 34);
+  assert.equal(mami.length, 34);
   assert.equal(sayaka.length, 30);
   assert.deepEqual(mami.slice(0, 30), madoka.slice(0, 30));
   assert.deepEqual(sayaka, madoka.slice(0, 30));

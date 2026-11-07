@@ -12,8 +12,8 @@ export const EXTRA_CARDS = Object.freeze({
 });
 
 export const EXTRA_DECKS = Object.freeze({
-  mami: [['evacuation', 2], ['doomed', 2], ['doubleSummon', 2], ['jammer', 2], ['swap', 2]],
-  madoka: [['evacuation', 2], ['mallet', 2], ['jammer', 2], ['reincarnate', 2], ['reborn', 1], ['avarice', 1]],
+  mami: [['evacuation', 2], ['jammer', 2]],
+  madoka: [['evacuation', 2], ['jammer', 2]],
 });
 
 export const isMonster = card => card && ['familiar', 'witch'].includes(card.type);
